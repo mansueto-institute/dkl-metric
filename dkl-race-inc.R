@@ -1,4 +1,5 @@
- 
+
+
 library(tidyverse)
 library(sf)
 library(lwgeom)
@@ -13,6 +14,8 @@ library(patchwork)
 
 # Read the .Renviron file (only necessary fi you ran census_api_key()
 readRenviron("~/.Renviron")
+
+# Explore ACS application ----------------------------------------------------
 
 # Function to launch a mini Shiny app to look up Census variables
 explore_acs_vars <- function () { 
@@ -36,28 +39,35 @@ explore_acs_vars <- function () {
   shinyApp(ui, server)
 }
 
+
+# Metro FIPS --------------------------------------------------------------
+
+wd_dev <- '/Users/nm/Desktop'
+cbsa_list <- c('35620') #'35620','31080','16980','19100','26420','47900','33100','37980','12060','14460'
+
+# Census Variables --------------------------------------------------------
+
 # Census Variables
-acs5_vars <- load_variables(year = 2019, dataset = c('acs5'), cache = FALSE) %>% 
+acs5_vars <- load_variables(year = 2020, dataset = c('acs5'), cache = FALSE) %>% 
   separate(col = 'concept',  into = c('concept_main','concept_part'), sep = c(' BY '), remove = FALSE,extra = "merge") %>%
   mutate(concept_part = case_when(is.na(concept_part) ~ 'TOTAL', TRUE ~ as.character(concept_part)))
 
 acs5_vars_selected <- c(# Race/ethnicity population 
-                        'B03002_003','B03002_004','B03002_005','B03002_006','B03002_007','B03002_008','B03002_009','B03002_012',
-                        # Household income
-                        'B19001_002', 'B19001_003', 'B19001_004', 'B19001_005', 'B19001_006', 'B19001_007', 'B19001_008', 'B19001_009', 'B19001_010', 'B19001_011', 'B19001_012', 'B19001_013', 'B19001_014', 'B19001_015', 'B19001_016', 'B19001_017',
-                        # Household income x Race/ethnicity
-                        'B19001A_002','B19001A_003','B19001A_004','B19001A_005','B19001A_006','B19001A_007','B19001A_008','B19001A_009','B19001A_010','B19001A_011','B19001A_012','B19001A_013','B19001A_014','B19001A_015','B19001A_016','B19001A_017',
-                        'B19001B_002','B19001B_003','B19001B_004','B19001B_005','B19001B_006','B19001B_007','B19001B_008','B19001B_009','B19001B_010','B19001B_011','B19001B_012','B19001B_013','B19001B_014','B19001B_015','B19001B_016','B19001B_017',
-                        'B19001C_002','B19001C_003','B19001C_004','B19001C_005','B19001C_006','B19001C_007','B19001C_008','B19001C_009','B19001C_010','B19001C_011','B19001C_012','B19001C_013','B19001C_014','B19001C_015','B19001C_016','B19001C_017',
-                        'B19001C_002','B19001C_003','B19001C_004','B19001C_005','B19001C_006','B19001C_007','B19001C_008','B19001C_009','B19001C_010','B19001C_011','B19001C_012','B19001C_013','B19001C_014','B19001C_015','B19001C_016','B19001C_017',
-                        'B19001D_002','B19001D_003','B19001D_004','B19001D_005','B19001D_006','B19001D_007','B19001D_008','B19001D_009','B19001D_010','B19001D_011','B19001D_012','B19001D_013','B19001D_014','B19001D_015','B19001D_016','B19001D_017',
-                        'B19001E_002','B19001E_003','B19001E_004','B19001E_005','B19001E_006','B19001E_007','B19001E_008','B19001E_009','B19001E_010','B19001E_011','B19001E_012','B19001E_013','B19001E_014','B19001E_015','B19001E_016','B19001E_017',
-                        'B19001F_002','B19001F_003','B19001F_004','B19001F_005','B19001F_006','B19001F_007','B19001F_008','B19001F_009','B19001F_010','B19001F_011','B19001F_012','B19001F_013','B19001F_014','B19001F_015','B19001F_016','B19001F_017',
-                        'B19001G_002','B19001G_003','B19001G_004','B19001G_005','B19001G_006','B19001G_007','B19001G_008','B19001G_009','B19001G_010','B19001G_011','B19001G_012','B19001G_013','B19001G_014','B19001G_015','B19001G_016','B19001G_017',
-                        'B19001H_002','B19001H_003','B19001H_004','B19001H_005','B19001H_006','B19001H_007','B19001H_008','B19001H_009','B19001H_010','B19001H_011','B19001H_012','B19001H_013','B19001H_014','B19001H_015','B19001H_016','B19001H_017',
-                        # Median Household Income
-                        'B19013_001') #,'B19013B_001','B19013C_001','B19013D_001','B19013E_001','B19013F_001','B19013G_001','B19013H_001','B19013I_001')
-
+  'B03002_003','B03002_004','B03002_005','B03002_006','B03002_007','B03002_008','B03002_009','B03002_012',
+  # Household income
+  'B19001_002', 'B19001_003', 'B19001_004', 'B19001_005', 'B19001_006', 'B19001_007', 'B19001_008', 'B19001_009', 'B19001_010', 'B19001_011', 'B19001_012', 'B19001_013', 'B19001_014', 'B19001_015', 'B19001_016', 'B19001_017',
+  # Household income x Race/ethnicity
+  'B19001A_002','B19001A_003','B19001A_004','B19001A_005','B19001A_006','B19001A_007','B19001A_008','B19001A_009','B19001A_010','B19001A_011','B19001A_012','B19001A_013','B19001A_014','B19001A_015','B19001A_016','B19001A_017',
+  'B19001B_002','B19001B_003','B19001B_004','B19001B_005','B19001B_006','B19001B_007','B19001B_008','B19001B_009','B19001B_010','B19001B_011','B19001B_012','B19001B_013','B19001B_014','B19001B_015','B19001B_016','B19001B_017',
+  'B19001C_002','B19001C_003','B19001C_004','B19001C_005','B19001C_006','B19001C_007','B19001C_008','B19001C_009','B19001C_010','B19001C_011','B19001C_012','B19001C_013','B19001C_014','B19001C_015','B19001C_016','B19001C_017',
+  'B19001C_002','B19001C_003','B19001C_004','B19001C_005','B19001C_006','B19001C_007','B19001C_008','B19001C_009','B19001C_010','B19001C_011','B19001C_012','B19001C_013','B19001C_014','B19001C_015','B19001C_016','B19001C_017',
+  'B19001D_002','B19001D_003','B19001D_004','B19001D_005','B19001D_006','B19001D_007','B19001D_008','B19001D_009','B19001D_010','B19001D_011','B19001D_012','B19001D_013','B19001D_014','B19001D_015','B19001D_016','B19001D_017',
+  'B19001E_002','B19001E_003','B19001E_004','B19001E_005','B19001E_006','B19001E_007','B19001E_008','B19001E_009','B19001E_010','B19001E_011','B19001E_012','B19001E_013','B19001E_014','B19001E_015','B19001E_016','B19001E_017',
+  'B19001F_002','B19001F_003','B19001F_004','B19001F_005','B19001F_006','B19001F_007','B19001F_008','B19001F_009','B19001F_010','B19001F_011','B19001F_012','B19001F_013','B19001F_014','B19001F_015','B19001F_016','B19001F_017',
+  'B19001G_002','B19001G_003','B19001G_004','B19001G_005','B19001G_006','B19001G_007','B19001G_008','B19001G_009','B19001G_010','B19001G_011','B19001G_012','B19001G_013','B19001G_014','B19001G_015','B19001G_016','B19001G_017',
+  'B19001H_002','B19001H_003','B19001H_004','B19001H_005','B19001H_006','B19001H_007','B19001H_008','B19001H_009','B19001H_010','B19001H_011','B19001H_012','B19001H_013','B19001H_014','B19001H_015','B19001H_016','B19001H_017',
+  # Median Household Income
+  'B19013_001') #,'B19013B_001','B19013C_001','B19013D_001','B19013E_001','B19013F_001','B19013G_001','B19013H_001','B19013I_001')
 
 # Build crosswalks and spatial geometry files -----------------------------
 
@@ -84,7 +94,7 @@ cbsa_xwalk <- cbsa_xwalk %>%
   select(county_fips,cbsa_fips,cbsa_title,area_type,central_outlying_county) 
 
 # County crosswalk
-us_county <- get_acs(year = 2019, geography = "county", variables = "B01003_001", geometry = TRUE, keep_geo_vars = TRUE, shift_geo = TRUE)
+us_county <- get_acs(year = 2020, geography = "county", variables = "B01003_001", geometry = TRUE, keep_geo_vars = TRUE, shift_geo = TRUE)
 us_county_cbsa <- us_county %>%
   rename_all(list(tolower)) %>%
   rename(county_fips = geoid,
@@ -108,10 +118,43 @@ us_county_cbsa <- us_county %>%
   ungroup() %>% 
   mutate(metro_rank = dense_rank(desc(cbsa_population)))
 
-# Read in places and tracts from local (see GitHub script)
-wd_dev <- '/Users/nm/Desktop/projects/work/mansueto/xwalks'
-us_places <- st_read(paste0(wd_dev,'/delineations/','place_delineations.geojson'))
-us_tracts <- st_read(paste0(wd_dev,'/delineations/','tract_delineations.geojson'))
+# Subset to CBSA  ---------------------------------------------------------
+
+# Subset to states in CBSA list
+state_fips_list <- us_county_cbsa %>% 
+  filter(cbsa_fips %in% cbsa_list) %>% st_drop_geometry() %>%
+  select(state_fips) %>% distinct() %>% pull()
+
+us_county_cbsa_subset <- us_county_cbsa %>%
+  filter(cbsa_fips %in% cbsa_list)
+  
+# Tract Delineations -------------------------------------------------------
+
+filedir <- paste0(tempdir(), '/tracts/')
+unlink(filedir, recursive = TRUE)
+dir.create(filedir)
+for (s in state_fips_list) {
+  state_shp <- paste0('https://www2.census.gov/geo/tiger/TIGER2020/TRACT/tl_2020_',s,'_tract.zip')
+  download.file(url = state_shp, destfile = paste0(filedir, basename(state_shp)))
+  unzip(paste0(filedir,basename(state_shp)), exdir= filedir)
+}
+list.files(path = filedir)
+us_tracts <- st_read(fs::dir_ls(filedir, regexp = "\\.shp$")[1])
+for (f in fs::dir_ls(filedir, regexp = "\\.shp$")[-1] ) {
+  state_sf <- st_read(f)
+  us_tracts <- rbind(us_tracts, state_sf)
+}
+
+us_tracts <- us_tracts %>% 
+  rename_all(tolower) %>%
+  mutate_at(vars(statefp, countyfp, tractce, geoid),list(as.character)) %>%
+  mutate(geoid = str_pad(geoid, width=11, side="left", pad="0"),
+         statefp = str_pad(statefp, width=2, side="left", pad="0"),
+         countyfp = str_pad(countyfp, width=3, side="left", pad="0"),
+         tractce = str_pad(tractce, width=6, side="left", pad="0")) %>%
+  filter(statefp %in% state_fips) %>% 
+  st_transform(crs = st_crs(4326)) %>% 
+  st_as_sf()
 
 # Tract geometries
 tract_geometries <- us_tracts %>% 
@@ -120,57 +163,101 @@ tract_geometries <- us_tracts %>%
   filter(pct_water < 1) %>%
   select(geoid, county_fips) %>% 
   left_join(., us_county_cbsa %>% st_drop_geometry() %>% select(county_fips, county_name, cbsa_fips, cbsa_title), by = c('county_fips'='county_fips'))
-  #filter(county_fips %in% c(us_county_cbsa %>% filter(cbsa_fips %in% cbsa_list) %>% select(county_fips) %>% st_drop_geometry() %>% pull()))
+#filter(county_fips %in% c(us_county_cbsa %>% filter(cbsa_fips %in% cbsa_list) %>% select(county_fips) %>% st_drop_geometry() %>% pull()))
 
 # Road geometries
 primary_roads <- tigris::primary_roads() %>% st_transform(crs = st_crs(4326)) %>% st_as_sf() 
 
+# City Delineations -------------------------------------------------------
+
+filedir <- paste0(tempdir(), '/places/')
+unlink(filedir, recursive = TRUE)
+dir.create(filedir)
+for (s in state_fips_list) {
+  state_shp <- paste0('https://www2.census.gov/geo/tiger/TIGER2020/PLACE/tl_2020_',s,'_place.zip')
+  download.file(url = state_shp, destfile = paste0(filedir, basename(state_shp)))
+  unzip(paste0(filedir,basename(state_shp)), exdir= filedir)
+}
+list.files(path = filedir)
+us_places <- st_read(fs::dir_ls(filedir, regexp = "\\.shp$")[1])
+for (f in fs::dir_ls(filedir, regexp = "\\.shp$")[-1] ) {
+  state_sf <- st_read(f)
+  us_places <- rbind(us_places, state_sf)
+}
+
+us_places <- us_places %>% 
+  rename_all(tolower) %>%
+  mutate_at(vars(geoid, statefp, placefp, placens),list(as.character)) %>%
+  mutate(geoid = str_pad(geoid, width=7, side="left", pad="0"),
+         statefp = str_pad(statefp, width=2, side="left", pad="0"),
+         placefp = str_pad(placefp, width=5, side="left", pad="0"),
+         placens = str_pad(placens, width=8, side="left", pad="0")) %>%
+  filter(statefp %in% state_fips) %>%
+  st_transform(crs = st_crs(4326)) %>% 
+  st_as_sf()
+
+places_url <- 'https://www2.census.gov/programs-surveys/popest/datasets/2010-2020/cities/SUB-EST2020_ALL.csv'
+tmp_filepath <- paste0(tempdir(), '/', basename(places_url))
+download.file(url = paste0(places_url), destfile = tmp_filepath)
+places_pop <- read_csv(tmp_filepath)
+
+places_pop <- places_pop %>%
+  rename_all(tolower) %>% 
+  filter(sumlev %in% c('061','162','171')) %>%
+  select(state, place, name, stname, popestimate2018) %>%
+  mutate(state = str_pad(state, width=2, side="left", pad="0"),
+         place = str_pad(place, width=5, side="left", pad="0"),
+         placeid = paste0(state,place)) %>%
+  rename(cityname = name)
+
+us_places <- inner_join(us_places, places_pop, by = c('geoid'='placeid')) %>%
+  st_transform(crs = st_crs(4326)) %>%  st_as_sf()
+
 # Largest city in each metro
-place_geometries <- us_places %>% 
-  st_join(., us_county_cbsa, left = FALSE, largest = TRUE) %>% 
+
+metro_delineation <- us_county_cbsa_subset %>% select(cbsa_fips, cbsa_title) %>% st_make_valid() %>% 
+  group_by(cbsa_fips, cbsa_title) %>% 
+  summarize(geometry = st_union(geometry)) %>%
+  ungroup()
+
+place_geometries <- us_places %>% st_make_valid() %>%
+  st_join(., metro_delineation %>% st_make_valid(), left = TRUE, largest = TRUE, join = st_within) %>% 
   filter(!is.na(cbsa_fips)) %>%
   group_by(cbsa_fips) %>%
   mutate(place_rank = dense_rank(desc(popestimate2018))) %>%
   ungroup() %>%
   filter(place_rank == 1) %>%
-  select(geoid, name, popestimate2018, cbsa_fips, cbsa_title, cbsa_population, county_fips, state_codes)
-
+  select(geoid, name, popestimate2018, cbsa_fips, cbsa_title)
 rm(us_tracts, us_places, us_county, state_xwalk, cbsa_xwalk)
 
 
 # Download and clean up ACS data -------------------------------------------------------
 
 # Assemble list of states and counties
-cbsa_list <- c('35620') #'35620','31080','16980','19100','26420','47900','33100','37980','12060','14460'
 state_county_list <- us_county_cbsa %>% filter(cbsa_fips %in% cbsa_list) %>% 
   st_drop_geometry() %>% select(state_fips, county_code) %>% as.list() 
 
-# Download data from Census API
+# Download data for select states and counties
 if (length(state_county_list[[2]]) < length(acs5_vars_selected)) {
   acs_data <- map2_dfr(.x = state_county_list[[1]], .y = state_county_list[[2]], .f = function(x , y) {
-    get_acs(year = 2019, geography = "tract", survey = 'acs5',
+    get_acs(year = 2020, geography = "tract", survey = 'acs5',
             variables = acs5_vars_selected,
             state = x, county = y)
   })
   area_water <- map2_dfr(.x = state_county_list[[1]], .y = state_county_list[[2]], .f = function(x , y) {
-    tigris::area_water(state = x, county = y, year = 2019) %>% st_transform(crs = st_crs(4326)) %>% st_as_sf() 
+    tigris::area_water(state = x, county = y, year = 2020) %>% st_transform(crs = st_crs(4326)) %>% st_as_sf() 
   })
 }
 
-
-state_xwalk
-
-# Download for all states
-acs_data <- map_dfr(.x = state_fips, .f = function(x) {
-  get_acs(year = 2019, geography = "tract", survey = 'acs5',
-          variables = acs5_vars_selected,
-          state = x)
-})
-
-area_water <- map_dfr(.x = state_fips, .f = function(x) {
-  tigris::area_water(state = x, year = 2019) %>% st_transform(crs = st_crs(4326)) %>% st_as_sf() 
-})
-
+# Download for all states (for bulk processing / all metros / all tracts)
+# acs_data <- map_dfr(.x = state_fips, .f = function(x) {
+#   get_acs(year = 2020, geography = "tract", survey = 'acs5',
+#           variables = acs5_vars_selected,
+#           state = x)
+# })
+# area_water <- map_dfr(.x = state_fips, .f = function(x) {
+#   tigris::area_water(state = x, year = 2020) %>% st_transform(crs = st_crs(4326)) %>% st_as_sf() 
+# })
 
 # Clean up ACS data
 acs_data_clean <- acs_data %>% 
@@ -181,7 +268,7 @@ acs_data_clean <- acs_data %>%
          label  = gsub("With income:", "", label ),
          label  = gsub("In labor force", "", label ),
          label  = gsub("Civilian labor force", "", label ),
-         label  = gsub("Household income the past 12 months \\(in 2019 inflation-adjusted dollars\\) --", "", label),
+         label  = gsub("Household income the past 12 months \\(in 2020 inflation-adjusted dollars\\) --", "", label),
          label  = gsub("", "", label ),
          label  = gsub("!!|:", "", label),
          label  = gsub("EstimateTotalNot Hispanic or Latino", "", label),
@@ -193,26 +280,26 @@ acs_data_clean <- acs_data %>%
            extra = "merge") %>%
   mutate(variable_supergroup = gsub("[^0-9]$", "", variable_group)) %>%
   mutate(variable_label = case_when(
-                           variable == 'B19013_001' ~ 'Median household income',
-                           variable_group %in% c('B11001A') ~ 'White alone',
-                           variable_group == 'B11001B' | variable %in% c('B03002_004','B19013B_001') ~ 'Black or African American alone',
-                           variable_group == 'B11001C' | variable %in% c('B03002_005','B19013C_001') ~ 'Native American alone',
-                           variable_group == 'B11001D' | variable %in% c('B03002_006','B19013D_001') ~ 'Asian alone',
-                           variable_group == 'B11001E' | variable %in% c('B03002_007','B19013E_001') ~ 'Pacific Islander alone',
-                           variable_group == 'B11001F' | variable %in% c('B03002_008','B19013F_001') ~ 'Some other race alone',
-                           variable_group == 'B11001G' | variable %in% c('B03002_009','B19013G_001') ~ 'Two or more races',
-                           variable_group == 'B11001H' | variable %in% c('B03002_003','B19013H_001') ~ 'White alone, not Hispanic or Latino', 
-                           variable_group == 'B11001I' | variable %in% c('B03002_012','B19013I_001') ~ 'Hispanic or Latino',
-                           variable_group %in% c('B19001A','B19101A') ~ paste0('White alone',' - ',label),
-                           variable_group %in% c('B19001B','B19101B') ~ paste0('Black or African American alone',' - ',label),
-                           variable_group %in% c('B19001C','B19101C') ~ paste0('Native American alone',' - ',label),
-                           variable_group %in% c('B19001D','B19101D') ~ paste0('Asian alone',' - ',label),
-                           variable_group %in% c('B19001E','B19101E') ~ paste0('Pacific Islander alone',' - ',label),
-                           variable_group %in% c('B19001F','B19101F') ~ paste0('Some other race alone',' - ',label),
-                           variable_group %in% c('B19001G','B19101G') ~ paste0('Two or more races',' - ',label),
-                           variable_group %in% c('B19001H','B19101H') ~ paste0('White alone, not Hispanic or Latino',' - ',label), 
-                           variable_group %in% c('B19001I','B19101I') ~ paste0('Hispanic or Latino',' - ',label),
-                           TRUE ~ as.character(label))) %>%
+    variable == 'B19013_001' ~ 'Median household income',
+    variable_group %in% c('B11001A') ~ 'White alone',
+    variable_group == 'B11001B' | variable %in% c('B03002_004','B19013B_001') ~ 'Black or African American alone',
+    variable_group == 'B11001C' | variable %in% c('B03002_005','B19013C_001') ~ 'Native American alone',
+    variable_group == 'B11001D' | variable %in% c('B03002_006','B19013D_001') ~ 'Asian alone',
+    variable_group == 'B11001E' | variable %in% c('B03002_007','B19013E_001') ~ 'Pacific Islander alone',
+    variable_group == 'B11001F' | variable %in% c('B03002_008','B19013F_001') ~ 'Some other race alone',
+    variable_group == 'B11001G' | variable %in% c('B03002_009','B19013G_001') ~ 'Two or more races',
+    variable_group == 'B11001H' | variable %in% c('B03002_003','B19013H_001') ~ 'White alone, not Hispanic or Latino', 
+    variable_group == 'B11001I' | variable %in% c('B03002_012','B19013I_001') ~ 'Hispanic or Latino',
+    variable_group %in% c('B19001A','B19101A') ~ paste0('White alone',' - ',label),
+    variable_group %in% c('B19001B','B19101B') ~ paste0('Black or African American alone',' - ',label),
+    variable_group %in% c('B19001C','B19101C') ~ paste0('Native American alone',' - ',label),
+    variable_group %in% c('B19001D','B19101D') ~ paste0('Asian alone',' - ',label),
+    variable_group %in% c('B19001E','B19101E') ~ paste0('Pacific Islander alone',' - ',label),
+    variable_group %in% c('B19001F','B19101F') ~ paste0('Some other race alone',' - ',label),
+    variable_group %in% c('B19001G','B19101G') ~ paste0('Two or more races',' - ',label),
+    variable_group %in% c('B19001H','B19101H') ~ paste0('White alone, not Hispanic or Latino',' - ',label), 
+    variable_group %in% c('B19001I','B19101I') ~ paste0('Hispanic or Latino',' - ',label),
+    TRUE ~ as.character(label))) %>%
   mutate(group_label = case_when(variable_group == "B02001" ~ 'Race',
                                  variable_group == "B03002" ~ 'Race / ethnicity',
                                  variable_group == "B03001" ~ 'Hispanic or Latino',
@@ -228,7 +315,9 @@ acs_data_clean <- acs_data %>%
                                  variable_group %in% c('B11001A', 'B11001B', 'B11001C', 'B11001D', 'B11001E', 'B11001F', 'B11001G', 'B11001H', 'B11001I') ~ 'Race / ethnicity (family)',
                                  variable_group %in% c('B19101A','B19101B','B19101C','B19101D','B19101E','B19101F','B19101G','B19101H','B19101I') ~ 'Race and Family income',             
                                  variable_group %in% c('B19001A','B19001B','B19001C','B19001D','B19001E','B19001F','B19001G','B19001H','B19001I') ~ 'Race and Household income'), 
-         county_fips = str_sub(geoid,1,5)) %>%
+         county_fips = str_sub(geoid,1,5))
+
+acs_data_clean <- acs_data_clean %>%
   left_join(., us_county_cbsa %>% st_drop_geometry(), by = c('county_fips'='county_fips')) %>%
   mutate(latino_adjustment = case_when(variable_group %in% c('B19001H','B19101H','B11001H') ~ -1*estimate,
                                        variable_group %in% c('B19001A','B19101A','B11001A') ~ estimate,
@@ -241,41 +330,41 @@ acs_data_clean <- acs_data %>%
   ungroup() %>%
   mutate(estimate2 = estimate,
          estimate2 = case_when(variable_group %in% c('B19001A','B19101A','B11001A') ~ latino_estimate,
-                              TRUE ~ as.numeric(estimate2)),
+                               TRUE ~ as.numeric(estimate2)),
          variable_label = case_when(variable_group %in% c('B19001A','B19101A') ~ gsub('White alone - ','Hispanic or Latino alone - ',variable_label),
-                           variable_group == 'B11001A' ~ gsub('White alone','Hispanic or Latino alone', variable_label),
-                           TRUE ~ as.character(variable_label))) %>%
+                                    variable_group == 'B11001A' ~ gsub('White alone','Hispanic or Latino alone', variable_label),
+                                    TRUE ~ as.character(variable_label))) %>%
   rename(tract_estimate = estimate2, tract_fips = geoid) %>%
-  select(tract_fips, variable, variable_group, variable_item, tract_estimate, moe, variable_supergroup, variable_label, group_label, county_fips, state_codes, state_fips, state_name, county_code, county_name, cbsa_fips, cbsa_title, area_type, central_outlying_county) %>%
+  select(tract_fips, variable, variable_group, variable_item, tract_estimate, moe, variable_supergroup, variable_label, group_label, county_fips, state_codes, state_fips, state_name, county_code, county_name, cbsa_fips, cbsa_title, area_type, central_outlying_county) 
   
 acs_data_clean <- acs_data_clean %>%
   mutate(variable_label_short = variable_label,
-    variable_label_short = str_replace(variable_label, "Less than \\$10,000", '< $10K'),
-    variable_label_short = str_replace(variable_label_short, "Less than \\$10,000", '< $10K'),
-    variable_label_short = str_replace(variable_label_short, "\\$10,000 to \\$14,999", '$10-14K'),
-    variable_label_short = str_replace(variable_label_short, "\\$15,000 to \\$19,999", '$15-19K'),
-    variable_label_short = str_replace(variable_label_short, "\\$20,000 to \\$24,999", '$20-24K'),
-    variable_label_short = str_replace(variable_label_short, "\\$25,000 to \\$29,999", '$25-29K'),
-    variable_label_short = str_replace(variable_label_short, "\\$30,000 to \\$34,999", '$30-34K'),
-    variable_label_short = str_replace(variable_label_short, "\\$35,000 to \\$39,999", '$35-39K'),
-    variable_label_short = str_replace(variable_label_short, "\\$40,000 to \\$44,999", '$40-44K'),
-    variable_label_short = str_replace(variable_label_short, "\\$45,000 to \\$49,999", '$45-49K'),
-    variable_label_short = str_replace(variable_label_short, "\\$50,000 to \\$59,999", '$50-59K'),
-    variable_label_short = str_replace(variable_label_short, "\\$60,000 to \\$74,999", '$60-74K'),
-    variable_label_short = str_replace(variable_label_short, "\\$75,000 to \\$99,999", '$75-99K'),
-    variable_label_short = str_replace(variable_label_short, "\\$100,000 to \\$124,999", '$100-124K'),
-    variable_label_short = str_replace(variable_label_short, "\\$125,000 to \\$149,999", '$125-149K'),
-    variable_label_short = str_replace(variable_label_short, "\\$150,000 to \\$199,999", '$150-199K'),
-    variable_label_short = str_replace(variable_label_short, "\\$200,000 or more", '> $200K'),
-    variable_label_short = str_replace(variable_label_short, "White alone, not Hispanic or Latino", 'White'),
-    variable_label_short = str_replace(variable_label_short, "Black or African American alone", 'Black'),
-    variable_label_short = str_replace(variable_label_short, "Hispanic or Latino alone", 'Latino'),
-    variable_label_short = str_replace(variable_label_short, "Hispanic or Latino", 'Latino'),
-    variable_label_short = str_replace(variable_label_short, "Asian alone", 'Asian'),
-    variable_label_short = str_replace(variable_label_short, "Some other race alone", 'Other race'),
-    variable_label_short = str_replace(variable_label_short, "Two or more races", '2+ races'),
-    variable_label_short = str_replace(variable_label_short, "Native American alone", 'Native American'),
-    variable_label_short = str_replace(variable_label_short, "Pacific Islander alone", 'Pacific Islander'))
+         variable_label_short = str_replace(variable_label, "Less than \\$10,000", '< $10K'),
+         variable_label_short = str_replace(variable_label_short, "Less than \\$10,000", '< $10K'),
+         variable_label_short = str_replace(variable_label_short, "\\$10,000 to \\$14,999", '$10-14K'),
+         variable_label_short = str_replace(variable_label_short, "\\$15,000 to \\$19,999", '$15-19K'),
+         variable_label_short = str_replace(variable_label_short, "\\$20,000 to \\$24,999", '$20-24K'),
+         variable_label_short = str_replace(variable_label_short, "\\$25,000 to \\$29,999", '$25-29K'),
+         variable_label_short = str_replace(variable_label_short, "\\$30,000 to \\$34,999", '$30-34K'),
+         variable_label_short = str_replace(variable_label_short, "\\$35,000 to \\$39,999", '$35-39K'),
+         variable_label_short = str_replace(variable_label_short, "\\$40,000 to \\$44,999", '$40-44K'),
+         variable_label_short = str_replace(variable_label_short, "\\$45,000 to \\$49,999", '$45-49K'),
+         variable_label_short = str_replace(variable_label_short, "\\$50,000 to \\$59,999", '$50-59K'),
+         variable_label_short = str_replace(variable_label_short, "\\$60,000 to \\$74,999", '$60-74K'),
+         variable_label_short = str_replace(variable_label_short, "\\$75,000 to \\$99,999", '$75-99K'),
+         variable_label_short = str_replace(variable_label_short, "\\$100,000 to \\$124,999", '$100-124K'),
+         variable_label_short = str_replace(variable_label_short, "\\$125,000 to \\$149,999", '$125-149K'),
+         variable_label_short = str_replace(variable_label_short, "\\$150,000 to \\$199,999", '$150-199K'),
+         variable_label_short = str_replace(variable_label_short, "\\$200,000 or more", '> $200K'),
+         variable_label_short = str_replace(variable_label_short, "White alone, not Hispanic or Latino", 'White'),
+         variable_label_short = str_replace(variable_label_short, "Black or African American alone", 'Black'),
+         variable_label_short = str_replace(variable_label_short, "Hispanic or Latino alone", 'Latino'),
+         variable_label_short = str_replace(variable_label_short, "Hispanic or Latino", 'Latino'),
+         variable_label_short = str_replace(variable_label_short, "Asian alone", 'Asian'),
+         variable_label_short = str_replace(variable_label_short, "Some other race alone", 'Other race'),
+         variable_label_short = str_replace(variable_label_short, "Two or more races", '2+ races'),
+         variable_label_short = str_replace(variable_label_short, "Native American alone", 'Native American'),
+         variable_label_short = str_replace(variable_label_short, "Pacific Islander alone", 'Pacific Islander'))
 
 
 # Calculate DKL -----------------------------------------------------------
@@ -357,11 +446,11 @@ rm(acs_dkl_1,acs_dkl_2)
 # Build analytical files --------------------------------------------------
 
 # Remove water areas from metro and city tract geometries
-msa_tract <- tract_geometries %>% filter(cbsa_fips %in% cbsa_list)
-water_outline <- st_crop(area_water, y = st_bbox(msa_tract)) %>% 
+msa_tract <- tract_geometries %>% filter(cbsa_fips %in% cbsa_list) %>% st_make_valid()
+water_outline <- st_crop(area_water %>% st_make_valid() , y = st_bbox(msa_tract)) %>% 
   filter(AWATER >= 1000000) %>% st_union() %>% st_transform(crs = st_crs(4326)) %>% st_as_sf() 
-msa_tract <- msa_tract %>% st_difference(., water_outline)
-city_outline <- place_geometries %>% filter(cbsa_fips %in% cbsa_list) %>% select(geoid, name)
+msa_tract <- msa_tract %>% st_difference(., water_outline) %>% st_make_valid() 
+city_outline <- place_geometries%>% filter(cbsa_fips %in% cbsa_list) %>% select(geoid, name) %>% st_make_valid() 
 city_tract <- st_intersection(x = msa_tract, y = city_outline)
 msa_roads <- st_crop(primary_roads, y = st_bbox(msa_tract))
 city_roads <- st_crop(primary_roads, y = st_bbox(city_tract))
@@ -422,6 +511,7 @@ acs_demos_race_and_household_income <- acs_data_clean %>% filter(group_label %in
   mutate(tract_share = tract_estimate/tract_estimate_income) 
 
 income_levels <- c('< $10K','$10-14K','$15-19K','$20-24K','$25-29K','$30-34K','$35-39K','$40-44K','$45-49K','$50-59K','$60-74K','$75-99K','$100-124K','$125-149K','$150-199K','> $200K')
+race_levels <- c("White","Black","Latino","Asian","2+ races","Native American","Pacific Islander","Other race")
 acs_demos_race_and_household_income$label_income <- factor(x = acs_demos_race_and_household_income$label_income, levels = income_levels)
 acs_demos_race_and_household_income$label_race <- factor(x = acs_demos_race_and_household_income$label_race, levels = race_levels)
 
@@ -464,7 +554,7 @@ theme_map <- theme(legend.title = element_text(size = 8, face='bold'),
                    axis.text = element_blank(),
                    plot.margin=unit(c(t=0,r=0,b=0,l=0), "mm"),
                    plot.subtitle = element_blank(),
-                   text = element_text(color = "#0a0a0a", family = "Roboto"))
+                   text = element_text(color = "#0a0a0a"))
 
 # Race / ethnicity
 pr_msa <- ggplot(msa_tract %>% left_join(., acs_dkl %>% filter(group_label == 'Race / ethnicity'), by = c('geoid'='tract_fips')), 
@@ -472,7 +562,7 @@ pr_msa <- ggplot(msa_tract %>% left_join(., acs_dkl %>% filter(group_label == 'R
   geom_sf() + scale_fill_viridis(name = 'DKL') + scale_color_viridis(name = 'DKL') + 
   geom_sf(data = msa_roads, color='white', fill = 'white', size = .05) +
   labs(subtitle = 'Race/ethnicity') +
-  theme_void() + theme_map + theme(legend.position = 'none', plot.subtitle = element_text(size = 13, hjust = 0.01, vjust = 0, face = 'bold', color = "#0a0a0a", family = "Roboto"))
+  theme_void() + theme_map + theme(legend.position = 'none', plot.subtitle = element_text(size = 13, hjust = 0.01, vjust = 0, face = 'bold', color = "#0a0a0a" ))
 
 pr_city <- ggplot(city_tract %>% left_join(., acs_dkl %>% filter(group_label == 'Race / ethnicity'), by = c('geoid'='tract_fips')), 
                   aes(fill = dkl_tract , color =  dkl_tract)) +
@@ -490,6 +580,7 @@ pr_map <- ggplot(acs_race_map) +
 
 pr_combo <- (( pr_msa + pr_city + plot_layout(ncol = 2, guides = "collect")) | pr_map ) #+ plot_layout(widths = c(2, 1)) 
 #ggsave(plot = pr_combo, filename = '/Users/nm/Desktop/nyc_r.png', height = 3, width = 10)
+pr_combo
 
 # Household income
 phi_msa <- ggplot(msa_tract %>% left_join(., acs_dkl %>% filter(group_label == 'Household income'), by = c('geoid'='tract_fips')), 
@@ -498,10 +589,10 @@ phi_msa <- ggplot(msa_tract %>% left_join(., acs_dkl %>% filter(group_label == '
   geom_sf(data = msa_roads, color='white', fill = 'white', size = .05) +
   #labs(subtitle = msa_tract %>% st_drop_geometry() %>% select(cbsa_title) %>% distinct() %>% pull() %>% gsub(', ',',\n',.) ) +
   labs(subtitle = 'Household income') + 
-  theme_void() + theme_map + theme(legend.position = 'none', plot.subtitle = element_text(size = 13, hjust = 0.01, vjust = 0, face = 'bold', color = "#0a0a0a", family = "Roboto"))
+  theme_void() + theme_map + theme(legend.position = 'none', plot.subtitle = element_text(size = 13, hjust = 0.01, vjust = 0, face = 'bold', color = "#0a0a0a" ))
 
 phi_city <- ggplot(city_tract %>% left_join(., acs_dkl %>% filter(group_label == 'Household income'), by = c('geoid'='tract_fips')), 
-                  aes(fill = dkl_tract , color =  dkl_tract)) +
+                   aes(fill = dkl_tract , color =  dkl_tract)) +
   geom_sf() + scale_fill_viridis(name = 'DKL') + scale_color_viridis(name = 'DKL') +
   geom_sf(data = city_roads, color='white', fill = 'white', size = .15) +
   labs(subtitle = city_tract %>% st_drop_geometry() %>% select(name) %>% distinct() %>% pull()) +
@@ -522,7 +613,7 @@ prhi_msa <- ggplot(msa_tract %>% left_join(., acs_dkl %>% filter(group_label == 
   geom_sf() + scale_fill_viridis(name = 'DKL') + scale_color_viridis(name = 'DKL') +
   geom_sf(data = msa_roads, color='white', fill = 'white', size = .05) +
   labs(subtitle = 'Race/ethnicity and household income') +
-  theme_void() + theme_map + theme(legend.position = 'none', plot.subtitle = element_text(size = 13, hjust = 0.01, vjust = 0, face = 'bold', color = "#0a0a0a", family = "Roboto"))
+  theme_void() + theme_map + theme(legend.position = 'none', plot.subtitle = element_text(size = 13, hjust = 0.01, vjust = 0, face = 'bold', color = "#0a0a0a"  ))
 
 prhi_city <- ggplot(city_tract %>% left_join(., acs_dkl %>% filter(group_label == 'Race and Household income'), by = c('geoid'='tract_fips')), 
                     aes(fill = dkl_tract, color = dkl_tract)) +
@@ -531,7 +622,7 @@ prhi_city <- ggplot(city_tract %>% left_join(., acs_dkl %>% filter(group_label =
   theme_void() + theme_map
 
 presid_city <- ggplot(city_tract %>% left_join(., dkl_residual, by = c('geoid'='tract_fips')), 
-       aes(fill = residual, color = residual)) +
+                      aes(fill = residual, color = residual)) +
   geom_sf() + 
   scale_fill_viridis(option = 'plasma', name = '2-way\nResidual', direction = -1) + 
   scale_color_viridis(option = 'plasma', name = '2-way\nResidual', direction = -1) +
@@ -540,6 +631,7 @@ presid_city <- ggplot(city_tract %>% left_join(., dkl_residual, by = c('geoid'='
 
 prhi_combo <- (( prhi_msa + prhi_city + plot_layout(ncol = 2, guides = "collect")) | presid_city ) #+ plot_layout(widths = c(2, 1)) 
 # ggsave(plot = prhi_combo, filename = '/Users/nm/Desktop/nyc_rhi.png', height = 3, width = 10)
+prhi_combo 
 
 rm(pr_msa, pr_city, pr_map)
 rm(phi_msa, phi_city, phi_map)
@@ -548,11 +640,13 @@ rm(prhi_msa, prhi_city, presid_city)
 # Combine maps
 map_combo <- (pr_combo / phi_combo / prhi_combo) + 
   plot_annotation(title = msa_tract %>% st_drop_geometry() %>% select(cbsa_title) %>% distinct() %>% pull()) & 
-  theme(plot.title = element_text(face = 'bold',color = "#0a0a0a", family = "Roboto"))
-rm(map_combo)
+  theme(plot.title = element_text(face = 'bold',color = "#0a0a0a"  ))
 
+map_combo
 city_name <- city_tract %>% st_drop_geometry() %>% select(name) %>% distinct() %>% pull()
-ggsave(plot = map_combo, filename = paste0('/Users/nm/Desktop/maps-',city_name,'.png'), height = 10, width = 10, dpi = 300)
+
+### TAKES A COUPLE MINUTES
+ggsave(plot = map_combo, filename = paste0(wd_dev,'/',city_name,' Maps.png'), height = 10, width = 10, dpi = 300)
 
 # Demographics
 p_bar1 <- ggplot(acs_demos_race_and_household_income) +
@@ -563,7 +657,7 @@ p_bar1 <- ggplot(acs_demos_race_and_household_income) +
   scale_y_continuous(labels = label_comma(scale = .001, accuracy = 1, suffix='K'), expand = c(.02, 0)) +
   geom_text(data = acs_demos_race_and_household_income %>% select(label_income, tract_estimate_income) %>% distinct(), 
             aes(x = label_income, y = tract_estimate_income, label= comma(tract_estimate_income, scale = .001, accuracy =1, suffix = 'K') ), 
-            hjust = 1, family = 'Roboto', fontface = "bold", size = 2.5) +
+            hjust = 1,   fontface = "bold", size = 2.5) +
   labs(subtitle = '') + xlab('Household income') + ylab('Households\n(thousands)') +
   theme(legend.title = element_blank(), 
         #legend.position = 'none',
@@ -571,7 +665,7 @@ p_bar1 <- ggplot(acs_demos_race_and_household_income) +
         # axis.title.y = element_blank(),
         # axis.text.y = element_blank(),
         axis.title.x = element_text(size = 8),
-        text = element_text(color = "#0a0a0a", family = "Roboto"))
+        text = element_text(color = "#0a0a0a" ))
 
 p_bar2 <- ggplot(acs_demos_race_and_household_income) +
   geom_bar(aes(x = label_income, y = tract_share, fill = label_race), 
@@ -580,7 +674,7 @@ p_bar2 <- ggplot(acs_demos_race_and_household_income) +
   theme_bw() +
   scale_y_continuous(labels = scales::percent, expand = c(.035, 0)) +
   geom_text(aes(label=ifelse(tract_share >= 0.12, paste0(round(tract_share*100,0),"%"),""), 
-                y = pos_id_share, x = label_income), family = 'Roboto', fontface = "bold", size = 3) +
+                y = pos_id_share, x = label_income), fontface = "bold", size = 3) +
   labs(subtitle = '') + xlab('Household income') + ylab('Households\n(percent)') +
   theme(legend.title = element_blank(), 
         #legend.position = 'none',
@@ -588,7 +682,7 @@ p_bar2 <- ggplot(acs_demos_race_and_household_income) +
         axis.title.y = element_blank(),
         axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
-        text = element_text(color = "#0a0a0a", family = "Roboto"))
+        text = element_text(color = "#0a0a0a" ))
 
 p_bar3 <- ggplot(acs_demos_race_or_household_income %>% filter(group_label == 'Race / ethnicity')) +
   geom_bar(aes(x = '', y = tract_share, fill = variable_label_short), color = 'white', stat="identity") + 
@@ -597,13 +691,13 @@ p_bar3 <- ggplot(acs_demos_race_or_household_income %>% filter(group_label == 'R
   scale_x_discrete(expand=c(0, 0)) + 
   scale_y_continuous(labels = scales::percent, expand = c(0, 0)) +
   geom_text(aes(label=ifelse(tract_share >= 0.10, paste0(round(tract_share*100,0),"%\n(",comma(tract_estimate/1000000, accuracy = 0.1),'M)'),""), 
-                y = pos_id_share, x = ''), family = 'Roboto', fontface = "bold", size = 2.5) +
+                y = pos_id_share, x = ''),  fontface = "bold", size = 2.5) +
   labs(subtitle = '') + xlab('Population\n(percent)') + ylab('Race / ethnicity') +
   theme(legend.title = element_blank(), 
         axis.title.x = element_text(size = 8),
         axis.ticks.x = element_blank(),
         plot.margin=unit(c(t=0,r=0,b=0,l=0), "mm"),
-        text = element_text(color = "#0a0a0a", family = "Roboto"))
+        text = element_text(color = "#0a0a0a" ))
 
 p_dot_race_income <- ggplot(acs_demos_race_and_household_income) +
   geom_point(aes(x = tract_estimate_dkl, y = label_income, size = tract_estimate, color = label_race, fill = label_race), 
@@ -618,7 +712,7 @@ p_dot_race_income <- ggplot(acs_demos_race_and_household_income) +
         legend.position = c("bottom"),
         plot.margin=unit(c(t=0,r=0,b=0,l=0), "mm"),
         legend.margin=margin(c(0,0,0,0)),
-        text = element_text(color = "#0a0a0a", family = "Roboto"))
+        text = element_text(color = "#0a0a0a"  ))
 
 p_dot_race <- ggplot(acs_demos_race_or_household_income %>% filter(group_label == 'Race / ethnicity')) +
   geom_point(aes(x = tract_estimate_dkl, y = '', size = tract_estimate, color = variable_label_short, fill = variable_label_short),
@@ -634,7 +728,7 @@ p_dot_race <- ggplot(acs_demos_race_or_household_income %>% filter(group_label =
         legend.position = c("top"),
         plot.margin=unit(c(t=0,r=0,b=0,l=0), "mm"),
         legend.margin=margin(c(0,0,0,0)),
-        text = element_text(color = "#0a0a0a", family = "Roboto"))
+        text = element_text(color = "#0a0a0a" ))
 
 p_dot_income <- ggplot(acs_demos_race_or_household_income %>% filter(group_label == 'Household income')) +
   geom_point(aes(x = tract_estimate_dkl, y = variable_label_short, size = tract_estimate),
@@ -650,7 +744,7 @@ p_dot_income <- ggplot(acs_demos_race_or_household_income %>% filter(group_label
         legend.position = c("bottom"),
         plot.margin=unit(c(t=0,r=0,b=0,l=0), "mm"),
         legend.margin=margin(c(0,0,0,0)),
-        text = element_text(color = "#0a0a0a", family = "Roboto"))
+        text = element_text(color = "#0a0a0a" ))
 
 layout1 <- "
 AAA###
@@ -674,11 +768,11 @@ p_demos <- (p_bar1 + p_bar2 + p_bar3 + plot_layout(design = "AAAABBBBC", guides 
         legend.box.margin = margin(0, 0, 0, 0),
         legend.margin=margin(c(0,0,0,0))) 
 
-ggsave(plot = p_dots, filename = paste0('/Users/nm/Desktop/charts-dkl-',city_name,'.png'), height = 5.5, width = 7)
-ggsave(plot = p_dots_demos, filename = paste0('/Users/nm/Desktop/charts-',city_name,'.png'), height = 4, width = 10)
-ggsave(plot = p_demos, filename = paste0('/Users/nm/Desktop/charts-demos-',city_name,'.png'), height = 4, width = 7)
+ggsave(plot = p_dots, filename = paste0(wd_dev,'/',city_name,' Dots.png'), height = 5.5, width = 7)
+ggsave(plot = p_dots_demos, filename = paste0(wd_dev,'/',city_name,' Dots Demos.png'), height = 4, width = 10)
+ggsave(plot = p_demos, filename = paste0(wd_dev,'/',city_name,' Demos.png'), height = 4, width = 7)
 
-rm(p_bar1, p_bar2, p_bar3, p_dot)
+rm(p_bar1, p_bar2, p_bar3)
 
 
 #explore_acs_vars()
@@ -702,4 +796,3 @@ rm(p_bar1, p_bar2, p_bar3, p_dot)
 # 'B19101F_002', 'B19101F_003', 'B19101F_004', 'B19101F_005', 'B19101F_006', 'B19101F_007', 'B19101F_008', 'B19101F_009', 'B19101F_010', 'B19101F_011', 'B19101F_012', 'B19101F_013', 'B19101F_014', 'B19101F_015', 'B19101F_016', 'B19101F_017',
 # 'B19101G_002', 'B19101G_003', 'B19101G_004', 'B19101G_005', 'B19101G_006', 'B19101G_007', 'B19101G_008', 'B19101G_009', 'B19101G_010', 'B19101G_011', 'B19101G_012', 'B19101G_013', 'B19101G_014', 'B19101G_015', 'B19101G_016', 'B19101G_017',
 # 'B19101H_002', 'B19101H_003', 'B19101H_004', 'B19101H_005', 'B19101H_006', 'B19101H_007', 'B19101H_008', 'B19101H_009', 'B19101H_010', 'B19101H_011', 'B19101H_012', 'B19101H_013', 'B19101H_014', 'B19101H_015', 'B19101H_016', 'B19101H_017')
-
