@@ -9,7 +9,7 @@ pacman::p_load(tidyverse, sf, lwgeom, tidycensus, scales, viridis, DT, shiny,
                readxl, patchwork, arrow)
 
 # get helper functions to clean data
-source("clean_one_way_acs.R")
+source("one-way-dkl/clean_one_way_acs.R")
 
 options(scipen=9999)
 
