@@ -36,7 +36,7 @@ clean_acs <- function(acs, acs_vars, cbsa_xwalk, state_xwalk) {
   df <- acs %>%
     rename_all(list(tolower)) %>%
     left_join(., acs_vars %>% select(name, label), by = c('variable' = 'name')) %>%
-    mutate(label = gsub("Estimate!!Total:", "", label), 
+    mutate(label = gsub("^Estimate!!Total[:]*", "", label), # try
            label = gsub("With income:", "", label),
            label = gsub("In labor force", "", label),
            label = gsub("Civilian labor force", "", label),
