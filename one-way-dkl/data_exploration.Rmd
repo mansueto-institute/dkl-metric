@@ -6,11 +6,12 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, fig.width = 12)
 ```
 
 ```{r}
 pacman::p_load(tidyverse, arrow, sf, tidycensus, viridis, patchwork)
+source("plotting.R")
 
 df15_dkl <- read_parquet("data/df15_dkl.parquet")
 df20_dkl <- read_parquet("data/df20_dkl.parquet")
@@ -39,61 +40,39 @@ geom_tract_15 <- geom_tract_15 %>%
 ```
 
 ```{r}
-# income buckets
+# income buckets do these need to be adjusted for inflation? or does it not matter bc we're using DKL metric?
+
 all_dkl <- bind_rows(
   mutate(df15_dkl, year = 2015),
   mutate(df20_dkl, year = 2020)
 )
 
-buckets_all <- all_dkl
-
-lvls <- all_dkl %>% 
-  filter(group_label == 'Household income') %>% 
-  select(label) %>% 
-  distinct() %>% 
-  pull(label)
-
-buckets_all$label <- factor(buckets_all$label, levels = lvls)
-
-buckets_all %>%
-  filter(group_label == 'Household income', cbsa_fips == '16980') %>%
-  select(group_label, cbsa_fips, label, dkl_bin, year) %>%
-  distinct() %>%
-  ggplot(aes(x = dkl_bin, y = label, fill = as.integer(label))) +
-  geom_bar(stat = "identity") +
-  geom_text(aes(label = round(dkl_bin, digits=2)), hjust = -0.1, size = 3) +
-  scale_fill_viridis_c() +
-  facet_wrap(~year, scales = "free_y") +
-  labs(title = "DKL by Income Buckets",
-       subtitle = "For Chicago-Naperville-Elgin, IL-IN-WI") +
-  theme_minimal() +
-  theme(legend.position = "none",
-        axis.title.y = element_blank())
+plot_bin_bar_facets(all_dkl, group_lab = 'Household income', cbsa = '16980')
+plot_bin_bar_facets(all_dkl, group_lab = 'Race', cbsa = '16980')
+plot_bin_bar_facets(all_dkl, group_lab = 'Industry', cbsa = '16980')
+plot_bin_bar_facets(all_dkl, group_lab = 'Occupation', cbsa = '16980')
+plot_bin_bar_facets(all_dkl, group_lab = 'Education attainment', cbsa = '16980')
+plot_bin_bar_facets(all_dkl, group_lab = 'Age', cbsa = '16980')
+plot_bin_bar_facets(all_dkl, group_lab = 'Employment status', cbsa = '16980')
 ```
 ```{r}
-buckets_all %>%
-  filter(group_label == 'Household income', cbsa_fips == '16980') %>%
-  select(group_label, cbsa_fips, label, dkl_bin, year) %>%
-  distinct() %>%
-  ggplot(aes(x = label, y = dkl_bin, fill = factor(year))) +
-  coord_flip() +
-  geom_bar(stat = "identity", position = "dodge") +
-  geom_text(aes(label = round(dkl_bin, digits = 2)), position = position_dodge(width = 0.9), hjust = -0.1, size = 3) +
-  scale_fill_manual(values = c("2015" = "blue", "2020" = "red")) +  # Set custom colors for each year
-  theme_minimal() +
-  theme(legend.position = "top")
+plot_bin_bar_dodge(all_dkl, group_lab = 'Household income', cbsa = '16980')
+plot_bin_bar_dodge(all_dkl, group_lab = 'Race', cbsa = '16980')
+plot_bin_bar_dodge(all_dkl, group_lab = 'Industry', cbsa = '16980')
+plot_bin_bar_dodge(all_dkl, group_lab = 'Occupation', cbsa = '16980')
+plot_bin_bar_dodge(all_dkl, group_lab = 'Education attainment', cbsa = '16980')
+plot_bin_bar_dodge(all_dkl, group_lab = 'Age', cbsa = '16980')
+plot_bin_bar_dodge(all_dkl, group_lab = 'Employment status', cbsa = '16980')
 ```
-
-
-
-
 
 ```{r}
 # race maps
 p_rac_15 <- geom_tract_15 %>% 
   left_join(df15_dkl, by = c('GEOID'='tract_fips')) %>% 
   filter(group_label == 'Race') %>%
-  ggplot(aes(fill = dkl_tract , color =  dkl_tract)) +
+  select(GEOID, group_label, dkl_tract) %>%
+  distinct() %>%
+  ggplot(aes(fill = dkl_tract , color = dkl_tract)) +
   geom_sf() + 
   scale_fill_viridis() + 
   scale_color_viridis() +
@@ -105,6 +84,8 @@ p_rac_15 <- geom_tract_15 %>%
 p_rac_20 <- geom_tract_20 %>% 
   left_join(df20_dkl, by = c('GEOID'='tract_fips')) %>% 
   filter(group_label == 'Race') %>%
+  select(GEOID, group_label, dkl_tract) %>%
+  distinct() %>%
   ggplot(aes(fill = dkl_tract , color =  dkl_tract)) +
   geom_sf() + 
   scale_fill_viridis() + 
