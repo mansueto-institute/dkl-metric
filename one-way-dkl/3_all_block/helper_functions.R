@@ -31,7 +31,7 @@ describe_all_variables <- function(acs_year, acs_dataset){
 
 
 get_var_labels <- function(acs_year, acs_dataset) {
-  # returns a clean data frame of the ace variable labels for race,
+  # returns a clean data frame of the acs variable labels for race,
   # household income, education attainment, and employment status
   # along with their descriptions for the specified year and acs dataset
   
@@ -71,11 +71,89 @@ get_var_labels <- function(acs_year, acs_dataset) {
                           "B03002_016", "B03002_017", "B03002_018", "B03002_019", "B03002_020", 
                           "B03002_021"))
   
-  return(list(acs5_vars, race, income, educ, empl_status))
+  return(list(acs5_vars, race, income, educ, empl_status)) # need zeallot package to unpack like python tuples when calling the function
 }
 
 
-# ------------- functions to get variable labels -------------------
+# ------------- functions to clean data and prepare for dkl -------------------
+
+get_cbsa_xwalk <- function(xwalk_url) {
+  tmp_filepath <- paste0(tempdir(), '\\', basename(xwalk_url))
+  download.file(url = xwalk_url, destfile = tmp_filepath, mode = 'wb')
+  cbsa_xwalk <- read_excel(tmp_filepath, sheet = 1, range = cell_rows(3:1919))
+  cbsa_xwalk <- cbsa_xwalk %>% 
+    select_all(~gsub("\\s+|\\.|\\/", "_", .)) %>%
+    rename_all(list(tolower)) %>%
+    mutate(fips_state_code = str_pad(fips_state_code, width=2, side="left", pad="0"),
+           fips_county_code = str_pad(fips_county_code, width=3, side="left", pad="0"),
+           county_fips = paste0(fips_state_code,fips_county_code)) %>%
+    rename(cbsa_fips = cbsa_code,
+           area_type = metropolitan_micropolitan_statistical_area) %>%
+    select(county_fips,cbsa_fips,cbsa_title,area_type,central_outlying_county)
+}
+
+join_metro_data <- function(acs5_dataset, acs5_var_labels, cbsa_xwalk, state_xwalk) {
+  df <- acs5_dataset %>%
+    rename(state_codes = state) %>%
+    left_join(acs5_var_labels, by = c("variable" = "name")) %>%
+    # filter all empty labels (don't need hispanic racial breakdown, etc)
+    filter(!is.na(label)) %>%
+    rename_all(list(tolower)) %>%
+    mutate(county_fips = str_sub(geoid,1,5),
+           tract = str_sub(geoid,6,9),
+           block_group = str_sub(geoid,10,12)) %>%
+    left_join(state_xwalk, by = c('county_fips'='county_fips')) %>%
+    left_join(cbsa_xwalk, by = c('county_fips'='county_fips')) %>%
+    group_by(geoid, variable_group) %>% mutate(block_total = sum(estimate)) %>% ungroup() %>%
+    group_by(county_fips, variable) %>% mutate(county_estimate = sum(estimate)) %>% ungroup() %>%
+    group_by(county_fips, variable_group) %>% mutate(county_total = sum(estimate)) %>% ungroup() %>%
+    group_by(cbsa_fips, variable) %>% mutate(cbsa_estimate = sum(estimate)) %>% ungroup() %>%
+    group_by(cbsa_fips, variable_group) %>% mutate(cbsa_total = sum(estimate)) %>% ungroup() %>%
+    mutate(block_pct = estimate / block_total,
+           county_pct = county_estimate / county_total,
+           cbsa_pct = cbsa_estimate / cbsa_total) %>%
+    rename(block_estimate = estimate,
+           block_fips = geoid) %>%
+    select(block_fips,county_fips,county_name,cbsa_fips,cbsa_title,area_type,central_outlying_county,state_codes,
+           state_fips,state_name,variable,variable_group,variable_item,group_label,label,block_pct,block_estimate,
+           moe,block_total,county_pct,county_estimate,county_total,cbsa_pct,cbsa_estimate,cbsa_total) %>%
+    arrange(county_fips, block_fips, variable) %>%
+    mutate_at(vars(block_pct,county_pct,cbsa_pct), ~replace(., is.nan(.), 0))
+  
+  return(df)
+}
+
+
+# -------------------- function to calculate dkl ----------------------------
+
+calculate_dkl <- function(acs5_dataset) {
+  
+  dkl_df  <- acs5_dataset %>% 
+    mutate(p_ni = block_total / cbsa_total, # Prob of being in block in MSA 
+           p_ni_yj = block_estimate / cbsa_estimate, # Prob of being in block among people in bin 
+           p_yj = cbsa_estimate / cbsa_total, # Prob of being in bin for everyone in MSA 
+           p_yj_ni = block_estimate / block_total) %>%
+    # replace all NaN porduced from 0/0 to 0
+    mutate_at(vars(p_ni,p_ni_yj,p_yj,p_yj_ni), ~replace(., is.nan(.), 0)) %>%
+    mutate(dkl_log_i = log2(p_yj_ni / p_yj), # share of income in tract relative to share of income in metro
+           djl_log_j = log2(p_ni_yj / p_ni) # tract share of metro bin relative to share of tract in metro
+    ) %>%
+    # replace all NaN and -Inf produced from taking log(0) and v small numbers
+    mutate_at(vars(dkl_log_i, djl_log_j), ~replace(., is.infinite(.), 0)) %>%
+    mutate_at(vars(dkl_log_i, djl_log_j), ~replace(., is.nan(.), 0)) %>%
+    mutate(dkl_block_j = p_yj_ni * dkl_log_i, # DKL block component
+           dkl_bin_i = p_ni_yj * djl_log_j) %>% # DKL bin component
+    # Sum DKL block components
+    group_by(variable_group, block_fips) %>% 
+    mutate(dkl_block = sum(dkl_block_j)) %>% 
+    ungroup() %>% 
+    # Sum DKL bin components
+    group_by(variable_group, cbsa_fips, variable) %>% 
+    mutate(dkl_bin = sum(dkl_bin_i )) %>% 
+    ungroup() # Sum DKL bin components
+  
+  return(dkl_df)
+}
 
 
 
