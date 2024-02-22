@@ -1,0 +1,118 @@
+---
+title: "5_plots"
+author: "Ivanna Rodríguez"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+This is better broken down by state, I think. Like having a markdown file for each state with visualizations and plotting functions you can just call. Also, would it be worth saving individual state shapefiles for ease of loading the shapefile?
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# install.packages(pacman)
+pacman::p_load(sf, tidyverse, tidycensus, readxl, magrittr, here, arrow)
+```
+
+```{r}
+folder_15 <- 'E:/acs5_block_2015_data/'
+folder_20 <- 'E:/acs5_block_2020_data/'
+plots_folder <- 'plots/'
+```
+
+
+```{r}
+# read in mutual info datasets and filter for top cities to make charts
+states <- c("CA", "IL", "NY", "TX", "AZ", "TN" ,"MA", "MI", "MD")
+cities <- c("New York", "Los Angeles", "Chicago", "Houston", "Austin", 
+            "Phoenix", "Boston", "Memphis", "Detroit", "Baltimore")
+
+# filter datasets to include only cities of interest
+get_fltr_data <- function(var) {
+  df_15 <- read_parquet(paste0(folder_15, paste0("mi_", var, "_15_blkgrp_all_states.parquet"))) %>% ungroup()
+  df_20 <- read_parquet(paste0(folder_20, paste0("mi_", var, "_20_blkgrp_all_states.parquet"))) %>% ungroup()
+  
+  df_flt_15 <- df_15 %>%
+  filter(state_codes %in% states,
+         str_detect(cbsa_title, paste(cities, collapse = "|"))) %>%
+    mutate(year = 2015)
+  
+  df_flt_20 <- df_20 %>%
+    filter(state_codes %in% states,
+         str_detect(cbsa_title, paste(cities, collapse = "|"))) %>%
+    mutate(year = 2020)
+  
+  return(rbind(df_flt_15, df_flt_20))
+}
+```
+
+```{r}
+race_mi <- get_fltr_data("race")
+income_mi <- get_fltr_data("income")
+educ_mi <- get_fltr_data("educ")
+empl_mi <- get_fltr_data("empl")
+```
+
+
+# Mutual Info Bar Graphs
+
+```{r}
+glimpse(race_mi)
+```
+
+```{r}
+plot_bars <- function(df, var) {
+  df$cbsa_title <- factor(df$cbsa_title, levels = unique(df$cbsa_title[order(df$cbsa_title)]))
+  
+  df %>%
+    ggplot(aes(x = mutual_info, y = cbsa_title, 
+               fill = as.factor(year))) +
+    geom_bar(stat = "identity", position = "dodge", color = "white") + # Removed black border
+    geom_text(aes(label = round(mutual_info, 2)), 
+              position = position_dodge(width = 0.9), hjust = -0.1, size = 3) +
+    labs(title = paste0("Mutual Information by ", var," CBSA Title (2015 vs 2020)"),
+       x = "Mutual Information",
+       y = NULL,
+       fill = "Year") +
+    scale_fill_brewer(palette = "Set2") + 
+    scale_x_continuous(labels = function(x) sprintf("%.2f", x)) + 
+    theme_minimal()
+}
+```
+
+
+```{r}
+plot_bars(race_mi, "Race")
+ggsave(paste0(plots_folder, "race_mi.png"), width = 10, height = 6, dpi = 300)
+
+plot_bars(income_mi, "Income")
+ggsave(paste0(plots_folder, "income_mi.png"), width = 10, height = 6, dpi = 300)
+
+plot_bars(educ_mi, "Education")
+ggsave(paste0(plots_folder, "educ_mi.png"), width = 10, height = 6, dpi = 300)
+
+plot_bars(empl_mi, "Employment")
+ggsave(paste0(plots_folder, "empl_mi.png"), width = 10, height = 6, dpi = 300)
+```
+
+
+
+# Maps
+
+
+```{r}
+# caution: heavy shapefile takes a few mins to load
+folder <- 'E:/shapefiles/'
+shp_15_tst <- st_read(paste0(folder, "usa_block_groups_2015.geojson"))
+```
+```{r}
+plot(shp_15_tst) # nope
+```
+
+```{r}
+# NY
+
+```
+
