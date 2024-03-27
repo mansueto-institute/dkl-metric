@@ -3,32 +3,9 @@
 # Date: 2/2/2024
 
 # install.packages("pacman")
-pacman::p_load(tidyverse, tidycensus, magrittr)
+pacman::p_load(tidyverse, tidycensus, magrittr, readxl)
 
 # ------------- functions to get variable labels -------------------
-
-describe_all_variables <- function(acs_year, acs_dataset){
-  # returns a dataframe with clean variable names and census codes to make it easier
-  # to look for he variables we want to include in the analysis
-  
-  # get all acs variable labels and descriptions for the specified year
-  acs5_vars <- load_variables(year = acs_year, 
-                              dataset = acs_dataset, 
-                              cache = FALSE)
-  
-  # separate concept column so its easier to sort through different categories
-  # and see the right variable names for our variables of interest
-  acs5_vars <- acs5_vars %>% separate(col = 'concept',
-                                      into = c('concept_main','concept_part'),
-                                      sep = c(' BY '),
-                                      remove = FALSE,
-                                      extra = "merge") %>%
-    mutate(concept_part = case_when(is.na(concept_part) ~ 'TOTAL',
-                                    TRUE ~ as.character(concept_part)))
-  
-  return(acs5_vars)
-}
-
 
 get_var_labels <- function(acs_year, acs_dataset) {
   # returns a clean data frame of the acs variable labels for race,
@@ -75,9 +52,33 @@ get_var_labels <- function(acs_year, acs_dataset) {
 }
 
 
+describe_all_variables <- function(acs_year, acs_dataset){
+  # returns a dataframe with clean variable names and census codes to make it easier
+  # to look for he variables we want to include in the analysis
+  
+  # get all acs variable labels and descriptions for the specified year
+  acs5_vars <- load_variables(year = acs_year, 
+                              dataset = acs_dataset, 
+                              cache = FALSE)
+  
+  # separate concept column so its easier to sort through different categories
+  # and see the right variable names for our variables of interest
+  acs5_vars <- acs5_vars %>% separate(col = 'concept',
+                                      into = c('concept_main','concept_part'),
+                                      sep = c(' BY '),
+                                      remove = FALSE,
+                                      extra = "merge") %>%
+    mutate(concept_part = case_when(is.na(concept_part) ~ 'TOTAL',
+                                    TRUE ~ as.character(concept_part)))
+  
+  return(acs5_vars)
+}
+
+
 # ------------- functions to clean data and prepare for dkl -------------------
 
 get_cbsa_xwalk <- function(xwalk_url) {
+  # downloads a cbsa cross walk file from the census reference files based on the file's URL
   tmp_filepath <- paste0(tempdir(), '\\', basename(xwalk_url))
   download.file(url = xwalk_url, destfile = tmp_filepath, mode = 'wb')
   cbsa_xwalk <- read_excel(tmp_filepath, sheet = 1, range = cell_rows(3:1919))

@@ -6,7 +6,7 @@
 
 # ---- setup --------------------------------------------------------------------
 
-pacman::p_load(tidyverse, tidycensus, magrittr, here, zeallot, arrow)
+pacman::p_load(tidyverse, tidycensus, magrittr, here, arrow, zeallot) # for %<-% operator
 
 options(scipen=9999) # prevents numbers from switching to scientific notation
 
