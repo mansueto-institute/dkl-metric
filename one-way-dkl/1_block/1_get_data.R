@@ -102,8 +102,8 @@ df <- block_vars_20 %>%
                                        "B03002_008", "B03002_009", "B03002_010", "B03002_011") ~ str_replace(label, "Not Hispanic or Latino", ""),
                            TRUE ~ label)) %>%
   filter( ! label %in% c("Total", "", "Not Hispanic or Latino"),
-          ! name %in% c("B03002_013", "B03002_014", "B03002_015", "B03002_016", 
-                        "B03002_017", "B03002_018", "B03002_019", "B03002_020", 
-                        "B03002_021"))
+          ! name %in% c("B03002_010", "B03002_011", "B03002_013", "B03002_014", 
+                        "B03002_015", "B03002_016", "B03002_017", "B03002_018", 
+                        "B03002_019", "B03002_020", "B03002_021"))
 
 write_rds(df, here("one-way-dkl/data/block_grp_labels.rds"))
