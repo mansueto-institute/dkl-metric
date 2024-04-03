@@ -17,8 +17,10 @@ pacman::p_load(sf, tidyverse, tidycensus, readxl, magrittr, here, arrow)
 ```
 
 ```{r}
+folder_10 <- 'E:/acs5_block_2010_data/'
 folder_15 <- 'E:/acs5_block_2015_data/'
 folder_20 <- 'E:/acs5_block_2020_data/'
+
 plots_folder <- 'plots/'
 ```
 
@@ -31,8 +33,11 @@ cities <- c("New York", "Los Angeles", "Chicago", "Houston", "Austin",
 
 # filter datasets to include only cities of interest
 get_fltr_data <- function(var) {
-  df_15 <- read_parquet(paste0(folder_15, paste0("mi_", var, "_15_blkgrp_all_states.parquet"))) %>% ungroup()
-  df_20 <- read_parquet(paste0(folder_20, paste0("mi_", var, "_20_blkgrp_all_states.parquet"))) %>% ungroup()
+  
+  df_15 <- read_parquet(paste0(folder_15, paste0("mi_", var, "_15_blkgrp_all_states.parquet"))) %>%
+    ungroup()
+  df_20 <- read_parquet(paste0(folder_20, paste0("mi_", var, "_20_blkgrp_all_states.parquet"))) %>%
+    ungroup()
   
   df_flt_15 <- df_15 %>%
   filter(state_codes %in% states,
@@ -43,6 +48,19 @@ get_fltr_data <- function(var) {
     filter(state_codes %in% states,
          str_detect(cbsa_title, paste(cities, collapse = "|"))) %>%
     mutate(year = 2020)
+  
+  # 2010 data currently only available for income
+  if (var == "income") {
+    df_10 <- read_parquet(paste0(folder_10, paste0("mi_", var, "_10_blkgrp_all_states.parquet"))) %>%
+      ungroup()
+    
+    df_flt_10 <- df_10 %>%
+      filter(state_codes %in% states,
+             str_detect(cbsa_title, paste(cities, collapse = "|"))) %>%
+      mutate(year = 2010)
+    
+    return(rbind(df_flt_10, df_flt_15, df_flt_20))
+    }
   
   return(rbind(df_flt_15, df_flt_20))
 }
@@ -59,31 +77,51 @@ empl_mi <- get_fltr_data("empl")
 # Mutual Info Bar Graphs
 
 ```{r}
-glimpse(race_mi)
+glimpse(income_mi)
 ```
+
+```{r}
+my_theme <- function() {
+  theme_minimal() +
+    theme(
+      plot.title = element_text(size = 16, face = "bold"),
+      plot.subtitle = element_text(size = 14),
+      axis.title = element_text(size = 12, face = "bold"),
+      axis.text = element_text(size = 10),
+      legend.title = element_text(size = 10, face = "bold"),
+      legend.text = element_text(size = 8),
+      legend.position = "top",
+      legend.justification = "center"
+    )
+}
+```
+
 
 ```{r}
 plot_bars <- function(df, var) {
   df$cbsa_title <- factor(df$cbsa_title, levels = unique(df$cbsa_title[order(df$cbsa_title)]))
   
   df %>%
-    ggplot(aes(x = mutual_info, y = cbsa_title, 
+    ggplot(aes(x = avg_dkl_cbsa_pop, y = cbsa_title, 
                fill = as.factor(year))) +
-    geom_bar(stat = "identity", position = "dodge", color = "white") + # Removed black border
-    geom_text(aes(label = round(mutual_info, 2)), 
+    geom_bar(stat = "identity", position = "dodge", 
+             color = "white") + # Removed black border
+    geom_text(aes(label = round(avg_dkl_cbsa_pop, 2)), 
               position = position_dodge(width = 0.9), hjust = -0.1, size = 3) +
-    labs(title = paste0("Mutual Information by ", var," CBSA Title (2015 vs 2020)"),
-       x = "Mutual Information",
-       y = NULL,
-       fill = "Year") +
-    scale_fill_brewer(palette = "Set2") + 
+    labs(title = paste0("Mutual Information by ", var," Bin and Year"),
+         subtitle = "for each major CBSA area",
+         x = "Mutual Information",
+         y = NULL,
+         fill = "Year") +
+    scale_fill_brewer(palette = "Accent") + 
     scale_x_continuous(labels = function(x) sprintf("%.2f", x)) + 
-    theme_minimal()
+    scale_y_discrete(labels = function(x) str_wrap(x, width = 25)) +
+    my_theme()
 }
 ```
 
 
-```{r}
+```{r out.height=10 out.width=10}
 plot_bars(race_mi, "Race")
 ggsave(paste0(plots_folder, "race_mi.png"), width = 10, height = 6, dpi = 300)
 
@@ -107,12 +145,11 @@ ggsave(paste0(plots_folder, "empl_mi.png"), width = 10, height = 6, dpi = 300)
 folder <- 'E:/shapefiles/'
 shp_15_tst <- st_read(paste0(folder, "usa_block_groups_2015.geojson"))
 ```
+
 ```{r}
-plot(shp_15_tst) # nope
 ```
 
 ```{r}
 # NY
-
 ```
 
