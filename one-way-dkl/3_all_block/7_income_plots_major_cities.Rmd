@@ -22,8 +22,110 @@ folder_20 <- 'E:/acs5_block_2020_data/'
 plots_folder <- 'plots/'
 ```
 
+```{r}
+states <- c("IL", "NY", "TX", "GA")
+cities <- c("Chicago", "New York", "Houston", "Atlanta")
 
+get_fltr_data <- function(var) {
+  df_10 <- read_parquet(paste0(folder_10, 
+                             paste0("dkl_", var, "_10_blkgrp_all_states.parquet"))) %>%
+  ungroup() %>%
+  filter(state_codes %in% states,
+         str_detect(cbsa_title, paste(cities, collapse = "|"))) %>%
+    select(block_fips, county_fips, county_name, cbsa_fips, cbsa_title,
+           state_codes, state_name, group_label, label, block_estimate, block_total,
+           county_estimate, county_total, dkl_block, dkl_bin) %>%
+    mutate(year = 2010)
+  
+  df_15 <- read_parquet(paste0(folder_15, 
+                               paste0("dkl_", var, "_15_blkgrp_all_states.parquet"))) %>%
+    ungroup() %>%
+    filter(state_codes %in% states,
+         str_detect(cbsa_title, paste(cities, collapse = "|"))) %>%
+    select(block_fips, county_fips, county_name, cbsa_fips, cbsa_title,
+           state_codes, state_name, group_label, label, block_estimate, block_total,
+           county_estimate, county_total, dkl_block, dkl_bin) %>%
+    mutate(year = 2015)
+  
+  df_20 <- read_parquet(paste0(folder_20, 
+                               paste0("dkl_", var, "_20_blkgrp_all_states.parquet"))) %>%
+    ungroup() %>%
+    filter(state_codes %in% states,
+         str_detect(cbsa_title, paste(cities, collapse = "|"))) %>%
+    select(block_fips, county_fips, county_name, cbsa_fips, cbsa_title,
+           state_codes, state_name, group_label, label, block_estimate, block_total,
+           county_estimate, county_total, dkl_block, dkl_bin) %>%
+    mutate(year = 2020)
+  
+  return(rbind(df_10, df_15, df_20))
+}
+```
 
+```{r}
+income <- get_fltr_data("income")
+```
+
+```{r}
+my_theme <- function() {
+  theme_minimal() +
+    theme(
+      plot.title = element_text(size = 16, face = "bold"),
+      plot.subtitle = element_text(size = 14),
+      axis.title = element_text(size = 12, face = "bold"),
+      axis.text = element_text(size = 10),
+      legend.title = element_text(size = 10, face = "bold"),
+      legend.text = element_text(size = 8),
+      legend.position = "top",
+      legend.justification = "center"
+    )
+}
+```
+
+```{r}
+plot_dkl_bin <- function(city) {
+  
+  lvls <- c("Less than $10,000", "$10,000 to $14,999", "$15,000 to $19,999", 
+            "$20,000 to $24,999", "$25,000 to $29,999", "$30,000 to $34,999",
+            "$35,000 to $39,999", "$40,000 to $44,999", "$45,000 to $49,999",
+            "$50,000 to $59,999", "$60,000 to $74,999", "$75,000 to $99,999",
+            "$100,000 to $124,999", "$125,000 to $149,999", "$150,000 to $199,999",
+            "$200,000 or more")
+  
+  income %>%
+  filter(str_detect(cbsa_title, paste(city, collapse = "|"))) %>%
+  select(group_label, cbsa_fips, label, dkl_bin, year) %>%
+  distinct() %>%
+  mutate(label = factor(label, levels = lvls, ordered = TRUE)) %>%
+  ggplot(aes(x = label, y = dkl_bin, fill = as.factor(year))) +
+  coord_flip() +
+  geom_bar(stat = "identity", position = "dodge", color = "white") +
+  geom_text(aes(label = round(dkl_bin, digits = 2)), 
+            position = position_dodge(width = 0.9), hjust = -0.1, size = 3) +
+  scale_fill_brewer(palette = "Accent") +
+  labs(title = "DKL by Income",
+         subtitle = paste("by year for", city),
+         x = NULL,
+         y = "DKL (bits)",
+         fill = "Year") +
+  scale_y_continuous(labels = function(x) sprintf("%.2f", x)) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 25)) +
+  my_theme()
+}
+```
+
+```{r out.height=12 out.width=10}
+plot_dkl_bin("Chicago")
+ggsave(paste0(plots_folder, "income_dkl_bin_bars_chicago.png"), width = 10, height = 7, dpi = 300)
+
+plot_dkl_bin("Houston")
+ggsave(paste0(plots_folder, "income_dkl_bin_bars_houston.png"), width = 10, height = 7, dpi = 300)
+
+plot_dkl_bin("Atlanta")
+ggsave(paste0(plots_folder, "income_dkl_bin_bars_atlanta.png"), width = 10, height = 7, dpi = 300)
+
+plot_dkl_bin("New York")
+ggsave(paste0(plots_folder, "income_dkl_bin_bars_new_york.png"), width = 10, height = 7, dpi = 300)
+```
 
 
 

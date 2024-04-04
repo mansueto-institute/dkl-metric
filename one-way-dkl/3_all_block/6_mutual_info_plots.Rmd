@@ -27,9 +27,9 @@ plots_folder <- 'plots/'
 
 ```{r}
 # read in mutual info datasets and filter for top cities to make charts
-states <- c("CA", "IL", "NY", "TX", "AZ", "TN" ,"MA", "MI", "MD")
+states <- c("CA", "IL", "NY", "TX", "AZ", "TN" ,"MA", "MI", "GA")
 cities <- c("New York", "Los Angeles", "Chicago", "Houston", "Austin", 
-            "Phoenix", "Boston", "Memphis", "Detroit", "Baltimore")
+            "Phoenix", "Boston", "Memphis", "Detroit", "Atlanta")
 
 # filter datasets to include only cities of interest
 get_fltr_data <- function(var) {
