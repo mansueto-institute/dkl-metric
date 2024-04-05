@@ -79,9 +79,6 @@ counties <- income %>%
   select(county_fips, county_name, cbsa_title) %>%
   mutate(county_fips = str_sub(county_fips, 3, 5)) %>%
   distinct()
-
-# map only the county in which each of the four cities is rather than cbsa ?
-county_codes <- c('121', '031', '', '')
 ```
 
 
@@ -100,17 +97,26 @@ get_block_shp <- function(state_code, county_codes) {
 ```
 
 ```{r}
-atl_shp <- get_block_shp('13','121')
+atl_shp <- get_block_shp('13', counties %>% 
+                           filter(str_detect(cbsa_title, "Atlanta")) %>% 
+                           pull(county_fips)
+                         )
 ```
 ```{r}
-nyc_shp <- get_block_shp('36', c('005', '081', '047', '061', '085'))
+nyc_shp <- get_block_shp('36', counties %>% 
+                           filter(str_detect(cbsa_title, "New York")) %>% 
+                           pull(county_fips))
 ```
 ```{r}
-chicago_shp <- get_block_shp('17', '031')
+chicago_shp <- get_block_shp('17', counties %>% 
+                           filter(str_detect(cbsa_title, "Chicago")) %>% 
+                           pull(county_fips))
 ```
 
 ```{r}
-houston_shp <- get_block_shp('48', '201')
+houston_shp <- get_block_shp('48', counties %>% 
+                           filter(str_detect(cbsa_title, "Houston")) %>% 
+                           pull(county_fips))
 ```
 
 ```{r}
@@ -134,7 +140,7 @@ my_theme <- function() {
 map_dkl_block <- function(city, yr) {
   
   df <- income %>%
-    filter(str_detect(cbsa_title, paste(city, collapse = "|")))
+    filter(str_detect(cbsa_title, city))
   
   max_range <- df %>%
     group_by(year) %>%
@@ -160,11 +166,14 @@ map_dkl_block <- function(city, yr) {
   shp %<>%
     left_join(df, by = c("GEOID" = "block_fips"))
   
+  cbsa <- df %>% select(cbsa_title) %>% distinct() %>% pull(cbsa_title)
+  
   shp %>%
     ggplot() +
-    geom_sf(aes(fill = dkl_block), size = 0.001) +
-    scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0, max_range)) +
-    labs(title = city,
+    geom_sf(aes(fill = dkl_block), color = NA, size = 0.001) +
+    scale_fill_viridis_c(option = "magma", direction = -1, 
+                         limits = c(0, max_range), na.value = "lightgray") +
+    labs(title = cbsa,
          subtitle = paste("DKL for Income in", yr),
          fill = "DKL (bits)") +  # Adding title to the legend
     my_theme() +

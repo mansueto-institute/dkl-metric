@@ -134,7 +134,60 @@ ggsave(paste0(plots_folder, "educ_mi.png"), width = 10, height = 6, dpi = 300)
 plot_bars(empl_mi, "Employment")
 ggsave(paste0(plots_folder, "empl_mi.png"), width = 10, height = 6, dpi = 300)
 ```
+# Mutual Info Boxplot for ALL CBSAs
 
+```{r}
+df_15 <- read_parquet(paste0(folder_15, "mi_income_15_blkgrp_all_states.parquet")) %>%
+    ungroup() %>% mutate(year = 2015)
+df_20 <- read_parquet(paste0(folder_20, "mi_income_20_blkgrp_all_states.parquet")) %>%
+    ungroup() %>% mutate(year = 2020)
+df_10 <- read_parquet(paste0(folder_10, "mi_income_10_blkgrp_all_states.parquet")) %>%
+      ungroup() %>% mutate(year = 2010)
+all_income_mi <- rbind(df_10, df_15, df_20)
+rm(df_15, df_20, df_10)
+```
+
+
+```{r}
+all_income_mi %>%
+  ggplot(aes(x = factor(year), y = avg_dkl_cbsa_pop, fill = as.factor(year))) +
+  geom_violin(width=0.6, alpha = 0.5, color = NA) +
+  geom_boxplot(width=0.4, alpha = 0.7) +
+  scale_fill_brewer(palette = "Accent") +
+  scale_y_continuous(limits = c(0, 1.4), breaks = seq(0, 2, 0.2)) +
+  labs(title = "Average Mutual Information",
+       subtitle = "Across All CBSA Areas by Year",
+       y = "Average Mutual Information", 
+       fill = "Year") +
+  my_theme() +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.x = element_text(face = "bold", size = 12)) +
+  guides(fill = FALSE)
+
+ggsave(paste0(plots_folder, "mi_boxplot.png"), width = 6, height = 6, dpi = 300)
+```
+
+
+```{r}
+# the other way with std dv and mean
+avg_mi <- income_mi %>% 
+  group_by(year) %>% 
+  summarise(sd_mi = sd(avg_dkl_cbsa_pop), 
+            avg_mi = mean(avg_dkl_cbsa_pop))
+
+avg_mi %>%
+  ggplot(aes(x = factor(year), y = avg_mi, group = factor(year))) + 
+  geom_point() +
+  geom_errorbar(aes(ymin = avg_mi - sd_mi, 
+                    ymax = avg_mi + sd_mi), 
+                width = 0.2) +
+  labs(title = "Average Mutual Information",
+       subtitle = "Across All CBSA Areas by Year, with Standard Deviation") +
+  my_theme() +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank())
+```
 
 
 # Maps

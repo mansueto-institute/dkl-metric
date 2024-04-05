@@ -66,6 +66,14 @@ income <- get_fltr_data("income")
 ```
 
 ```{r}
+income %>%
+  group_by(year, cbsa_title) %>%
+  summarise(n_blocks = n_distinct(block_fips)) %>%
+  pivot_wider(names_from = year, values_from = n_blocks)
+```
+
+
+```{r}
 my_theme <- function() {
   theme_minimal() +
     theme(
@@ -91,25 +99,29 @@ plot_dkl_bin <- function(city) {
             "$100,000 to $124,999", "$125,000 to $149,999", "$150,000 to $199,999",
             "$200,000 or more")
   
-  income %>%
-  filter(str_detect(cbsa_title, paste(city, collapse = "|"))) %>%
-  select(group_label, cbsa_fips, label, dkl_bin, year) %>%
-  distinct() %>%
-  mutate(label = factor(label, levels = lvls, ordered = TRUE)) %>%
-  ggplot(aes(x = label, y = dkl_bin, fill = as.factor(year))) +
-  coord_flip() +
-  geom_bar(stat = "identity", position = "dodge", color = "white") +
-  geom_text(aes(label = round(dkl_bin, digits = 2)), 
+  df <- income %>%
+    filter(str_detect(cbsa_title, paste(city, collapse = "|"))) %>%
+    select(group_label, cbsa_fips, cbsa_title, label, dkl_bin, year) %>%
+    distinct() %>%
+    mutate(label = factor(label, levels = lvls, ordered = TRUE))
+  
+  cbsa <- df %>% select(cbsa_title) %>% distinct() %>% pull(cbsa_title)
+  
+  df %>%
+    ggplot(aes(x = label, y = dkl_bin, fill = as.factor(year))) +
+    coord_flip() +
+    geom_bar(stat = "identity", position = "dodge", color = "white") +
+    geom_text(aes(label = round(dkl_bin, digits = 2)), 
             position = position_dodge(width = 0.9), hjust = -0.1, size = 3) +
-  scale_fill_brewer(palette = "Accent") +
-  labs(title = "DKL by Income",
-         subtitle = paste("by year for", city),
+    scale_fill_brewer(palette = "Accent") +
+    labs(title = "DKL by Income and Year",
+         subtitle = paste("for", cbsa),
          x = NULL,
          y = "DKL (bits)",
          fill = "Year") +
-  scale_y_continuous(labels = function(x) sprintf("%.2f", x)) +
-  scale_x_discrete(labels = function(x) str_wrap(x, width = 25)) +
-  my_theme()
+    scale_y_continuous(labels = function(x) sprintf("%.2f", x)) +
+    scale_x_discrete(labels = function(x) str_wrap(x, width = 25)) +
+    my_theme()
 }
 ```
 
