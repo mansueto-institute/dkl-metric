@@ -1,0 +1,124 @@
+---
+title: "replicating_figures"
+author: "Ivanna Rodríguez and Jimena Salinas"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE) # , fig.width = 12
+options(scipen=9999)
+```
+
+```{r, include=FALSE}
+pacman::p_load(tidyverse, arrow, sf, tidycensus, viridis, patchwork, here)
+source(here("one-way-dkl/chicago_tracts/plotting.R"))
+
+df15_dkl <- read_parquet("data/df15_dkl.parquet") 
+df20_dkl <- read_parquet("data/df20_dkl.parquet")
+all_dkl <- bind_rows(
+  mutate(df15_dkl, year = 2015),
+  mutate(df20_dkl, year = 2020)
+)
+```
+
+```{r}
+all_dkl %>%
+  group_by(year) %>%
+  summarise(n_tracts = n_distinct(tract_fips),
+            n_county = n_distinct(county_fips),
+            n_cbsa = n_distinct(cbsa_fips),
+            vars = n_distinct(group_label))
+
+# Chicago-Naperville-Elgin, IL-IN-WI
+all_dkl %>%
+  filter(cbsa_fips == 16980) %>%
+  group_by(year) %>%
+  summarise(n_tracts = n_distinct(tract_fips),
+            n_county = n_distinct(county_fips),
+            n_cbsa = n_distinct(cbsa_fips),
+            vars = n_distinct(group_label))
+
+income_chi_cbsa <- all_dkl %>%
+  filter(group_label == "Household income",
+         cbsa_fips == 16980)
+```
+
+
+```{r}
+# Log mean income
+mean_income <- income_chi_cbsa %>%
+  select(tract_fips, group_label, label, tract_estimate, tract_total, county_total, cbsa_total, year) %>%
+  unique() %>%
+  mutate(label = ifelse(label == "Less than $10,000", "$0 to $9,999",
+                          ifelse(label == "$200,000 or more", "$200,000 to $200,000", label)),
+         lb = as.numeric(gsub("[^0-9]", "", regmatches(label, regexpr("\\$([0-9,]+) to", label)))),
+         ub = as.numeric(gsub("[^0-9]", "", regmatches(label, regexpr("to \\$([0-9,]+)", label)))),
+         lab_num = round((lb + ub) / 2),
+         tract_est_income = lab_num * tract_estimate) %>%
+  group_by(year, tract_fips) %>%
+  summarise(mean_income = mean(tract_est_income),
+            log_mean_income = log(mean_income)) %>%
+  ungroup() %>%
+  group_by(year) %>%
+  mutate(log_mean_income = ifelse(is.infinite(log_mean_income), NA, log_mean_income),
+         mean_log_mean_income = mean(log_mean_income, na.rm = T),
+         log_mean_income_centered = log_mean_income - mean_log_mean_income)
+
+mean_income %>%
+  filter(year == 2015) %>%
+  ggplot(aes(x = mean_income)) +
+  geom_histogram(color = "white") +
+  labs(title = "Mean Income Distribution")
+
+mean_income %>%
+  filter(year == 2015) %>%
+  ggplot(aes(x = log_mean_income_centered)) +
+  geom_histogram(aes(y = ..count../sum(..count..)), binwidth = 0.1, color = "white", alpha = 0.7) +
+  labs(title = "Log Mean Income Distribution")
+
+mean_income %>%
+  filter(year == 2020) %>%
+  ggplot(aes(x = log_mean_income_centered)) +
+  geom_histogram(aes(y = ..count../sum(..count..)), binwidth = 0.1, color = "white", alpha = 0.7) +
+  labs(title = "Log Mean Income Distribution")
+```
+
+```{r}
+# get geographic data for maps
+geom_tract_20 <- get_acs(year = 2020, geography = "tract", survey = 'acs5', variables = 'B02001_001', state = '17', county = '031', geometry = TRUE) %>%
+  select(GEOID) %>% st_transform(crs = st_crs(4326)) 
+
+geom_tract_15 <- get_acs(year = 2015, geography = "tract", survey = 'acs5', variables = 'B02001_001', state = '17', county = '031', geometry = TRUE) %>%
+  select(GEOID) %>% st_transform(crs = st_crs(4326)) 
+
+community_areas <- sf::st_read('https://data.cityofchicago.org/api/geospatial/cauq-8yn6?method=export&format=GeoJSON') %>% 
+  st_transform(crs = st_crs(4326)) %>% 
+  st_as_sf() %>% 
+  select(community)
+
+geom_tract_20 <- geom_tract_20 %>%
+  st_join(., community_areas, left= TRUE, largest = TRUE) %>%
+  filter(!is.na(community))
+
+geom_tract_15 <- geom_tract_15 %>%
+  st_join(., community_areas, left= TRUE, largest = TRUE) %>%
+  filter(!is.na(community))
+```
+
+
+```{r}
+#  Average log household income in Chicago Census Tracts
+
+# Income distributions in selected census tracts? or counties? shown in Fig. 1A.
+
+# Citywide distribution of household incomes
+
+```
+
+
+```{r}
+# log2 DLK Map fig 2A
+# 
+```
+

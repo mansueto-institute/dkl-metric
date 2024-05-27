@@ -1,0 +1,258 @@
+---
+title: "data_exploration"
+author: "Ivanna Rodríguez"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE) # , fig.width = 12, fig.height = 12
+```
+
+```{r, include=FALSE}
+# install.packages("pacman")
+pacman::p_load(tidyverse, arrow, sf, tidycensus, viridis, patchwork, here, magrittr)
+source(here("one-way-dkl/plotting.R"))
+
+df15_dkl <- read_parquet(here("one-way-dkl/data/test_dkl_block_15.parquet"))
+df20_dkl <- read_parquet(here("one-way-dkl/data/test_dkl_block_20.parquet"))
+
+# spatial files
+geom_block_15 <- st_read(here("one-way-dkl/data/geom_block_15.geojson"))
+geom_block_20 <- st_read(here("one-way-dkl/data/geom_block_20.geojson"))
+community_areas <- st_read(here("one-way-dkl/data/community_areas.geojson"))
+
+map_dkl_df15 <- geom_block_15 %>% 
+  right_join(df15_dkl, by=c('GEOID'='block_fips'))
+
+map_dkl_df20 <- geom_block_20 %>% 
+  right_join(df20_dkl, by=c('GEOID'='block_fips'))
+```
+
+```{r}
+# income buckets
+all_dkl <- bind_rows(
+  mutate(df15_dkl, year = 2015),
+  mutate(df20_dkl, year = 2020)
+)
+```
+
+```{r}
+plot_bin_bar_facets(all_dkl, group_lab = 'Household Income', cbsa = '16980')
+plot_bin_bar_facets(all_dkl, group_lab = 'Race/Ethnicity', cbsa = '16980')
+plot_bin_bar_facets(all_dkl, group_lab = 'Education attainment', cbsa = '16980')
+plot_bin_bar_facets(all_dkl, group_lab = 'Employment', cbsa = '16980')
+```
+
+
+```{r}
+plot_bin_bar_dodge(all_dkl, group_lab = 'Household Income', cbsa = '16980')
+plot_bin_bar_dodge(all_dkl, group_lab = 'Race/Ethnicity', cbsa = '16980')
+plot_bin_bar_dodge(all_dkl, group_lab = 'Education attainment', cbsa = '16980')
+plot_bin_bar_dodge(all_dkl, group_lab = 'Employment', cbsa = '16980')
+```
+```{r}
+# figure out how to add these to maps for easier readability later
+
+# reference community areas
+comm_area_names <- c("Hyde Park", "Bridgeport", "South Shore", "South Side", "Chatham",
+                     "River North", "Logan Square", "Lincoln Square", "Lincoln Park",
+                     "Humboldt Park", "North Lawndale")
+geom_block_15 %<>%
+  mutate(community = str_to_title(community))
+
+geom_block_20 %<>%
+   mutate(community = str_to_title(community))
+```
+
+
+```{r}
+max_range <- max(c(max(map_dkl_df15$dkl_bin), max(map_dkl_df15$dkl_bin)))
+
+p2_educ_15 <- test_dkl_map_color_palette(map_dkl_df15, "Education attainment", "2015", max_range, v_opt = "magma", v_dir = -1)
+p2_educ_20 <- test_dkl_map_color_palette(map_dkl_df20, "Education attainment", "2020", max_range, v_opt = "magma", v_dir = -1)
+
+p2_educ_15 + p2_educ_20
+
+# race maps
+p_rac_15 <- plot_dkl_map(map_dkl_df15, "Race/Ethnicity", "2015")
+p_rac_20 <- plot_dkl_map(map_dkl_df20, "Race/Ethnicity", "2020")
+
+p_rac_15 + p_rac_20
+```
+
+### Race 2020
+
+```{r}
+race <- map_dkl_df20 %>% 
+    filter(group_label == "Race/Ethnicity") %>%
+    select(GEOID, label, block_pct, block_estimate, block_total, dkl_block) %>%
+    distinct()
+```
+
+```{r}
+race_raw <- race %>%
+  group_by(GEOID) %>%
+  slice_max(order_by = block_pct, n = 1) %>%
+  rename(race = label) %>%
+  mutate(race = case_when(race == "White alone" ~ "White",
+                          race == "Black or African American alone" ~ "Black",
+                          race == "Hispanic or Latino (any race)" ~ "Latino",
+                          race == "Asian alone" ~ "Asian",
+                          TRUE ~ "Other")) %>%
+  ungroup()
+```
+
+```{r}
+race_raw %>% count(race)
+```
+
+```{r}
+community_data <- data.frame(
+  community = c("Downtown", "Hyde Park", "Chatham", "Riverdale", "Little Village", "Humboldt Park", "Lincoln Park", "Albany Park"),
+  lon = c(-87.623177, -87.5917, -87.6146, -87.6149, -87.7050, -87.7213, -87.6488, -87.7280),
+  lat = c(41.881832, 41.7948, 41.7401, 41.6476, 41.8445, 41.8991, 41.9255,41.9683)
+)
+```
+
+```{r}
+race_raw$race <- factor(x = race_raw$race, levels = c("White","Black","Latino", "Asian","Other"))
+
+p_race_raw_20 <- race_raw %>%
+  ggplot() +
+  geom_sf(aes(fill = race), size = 0, alpha=0.9) +
+  scale_fill_manual(name = '', values = c("#56B4E9",'#CC79A7',"#009E73","#F0E442",'#FEFEDF')) +
+  # scale_fill_viridis_d() + 
+  labs(title = "Predominant Race/Ethnicity 2020") +
+  theme_minimal() + 
+  theme(axis.text = element_blank()) +
+  geom_text(data = community_data, aes(x = lon, y = lat, label = community),
+            color = "black", size = 2, hjust = 0, vjust = 0) +
+  geom_text(data = community_data, aes(x = lon, y = lat, label = community),
+            color = "white", size = 2, hjust = -0.01, vjust = -0.1) +
+  theme(axis.title = element_blank(),
+        legend.key.width = unit(0.5, "cm"),
+        legend.key.height = unit(0.5, "cm"),
+        legend.text = element_text(size = 7)) +
+  guides(fill = guide_legend(override.aes = list(color = "white")))
+  
+p_race_raw_20
+
+# ggsave(here("one-way-dkl/1_block/p_race_raw_20.png"), width = 10, height = 8, dpi = 300)
+```
+
+```{r}
+p_race_new_dkl_20 <- race %>% 
+  ggplot() +
+  geom_sf(aes(fill = dkl_block), size = 0.001) + 
+  scale_fill_viridis_c(option="magma", direction=-1) +
+  labs(title = paste('DKL for Race 2020')) +
+  theme_minimal() + 
+  theme(legend.title = element_blank(), 
+          axis.text = element_blank()) +
+  geom_text(data = community_data, aes(x = lon, y = lat, label = community),
+            color = "black", size = 2, hjust = 0, vjust = 0) +
+  geom_text(data = community_data, aes(x = lon, y = lat, label = community),
+            color = "white", size = 2, hjust = -0.01, vjust = -0.1) +
+  theme(axis.title = element_blank(),
+        legend.key.width = unit(0.5, "cm"),
+        legend.key.height = unit(0.5, "cm"),
+        legend.text = element_text(size = 7))
+
+p_race_new_dkl_20
+```
+```{r}
+p_race_new_dkl_20 + p_race_raw_20
+```
+
+```{r}
+p2_race_new_dkl_20 <- race %>% 
+  ggplot() +
+  geom_sf(aes(fill = dkl_block), size = 0.001) + 
+  scale_fill_viridis_c(option="mako", direction = -1) +
+  labs(title = paste('DKL for Race 2020')) +
+  theme_minimal() + 
+  theme(legend.title = element_blank(), 
+          axis.text = element_blank()) +
+  geom_text(data = community_data, aes(x = lon, y = lat, label = community),
+            color = "black", size = 2, hjust = 0, vjust = 0) +
+  geom_text(data = community_data, aes(x = lon, y = lat, label = community),
+            color = "white", size = 2, hjust = -0.01, vjust = -0.1) +
+  theme(axis.title = element_blank(),
+        legend.key.width = unit(0.5, "cm"),
+        legend.key.height = unit(0.5, "cm"),
+        legend.text = element_text(size = 7))
+
+p2_race_new_dkl_20
+```
+
+```{r}
+p2_race_new_dkl_20 + p_race_raw_20
+```
+
+```{r}
+# education maps
+p_educ_15 <- plot_dkl_map(map_dkl_df15, "Education attainment", "2015")
+p_educ_20 <- plot_dkl_map(map_dkl_df20, "Education attainment", "2020")
+
+p_educ_15 + p_educ_20
+```
+```{r}
+# education maps
+max_range <- max(c(max(map_dkl_df15$dkl_bin), max(map_dkl_df15$dkl_bin)))
+
+p2_educ_15 <- test_dkl_map_color_palette(map_dkl_df15, "Education attainment", "2015", max_range, v_opt = "mako", v_dir = -1)
+p2_educ_20 <- test_dkl_map_color_palette(map_dkl_df20, "Education attainment", "2020", max_range, v_opt = "mako", v_dir = -1)
+
+p2_educ_15 + p2_educ_20
+```
+```{r}
+# education maps
+max_range <- max(c(max(map_dkl_df15$dkl_bin), max(map_dkl_df15$dkl_bin)))
+
+p2_educ_15 <- test_dkl_map_color_palette(map_dkl_df15, "Education attainment", "2015", max_range, v_opt = "magma", v_dir = -1)
+p2_educ_20 <- test_dkl_map_color_palette(map_dkl_df20, "Education attainment", "2020", max_range, v_opt = "magma", v_dir = -1)
+
+p2_educ_15 + p2_educ_20
+```
+
+
+```{r}
+education <- all_dkl %>% 
+    filter(group_label == "Education attainment") %>%
+    select(year, block_fips, label, block_pct, block_estimate, block_total, dkl_block) %>%
+    distinct()
+```
+
+```{r}
+education %>%
+  filter(year == 2020) %>%
+  group_by(label) %>%
+  summarise(sum_tot = sum(block_estimate)) %>%
+  arrange(desc(sum_tot)) %>%
+  mutate(p = sum_tot/sum(sum_tot) * 100)
+```
+
+```{r}
+summary(education$dkl_block)
+```
+
+
+```{r}
+# employment maps
+p_emp_15 <- plot_dkl_map(map_dkl_df15, "Employment", "2015")
+p_emp_20 <- plot_dkl_map(map_dkl_df20, "Employment", "2020")
+
+p_emp_15 + p_emp_20
+```
+
+```{r}
+# income maps
+p_inc_15 <- plot_dkl_map(map_dkl_df15, "Household Income", "2015")
+p_inc_20 <- plot_dkl_map(map_dkl_df20, "Household Income", "2020")
+
+p_inc_15 + p_inc_20
+```
+

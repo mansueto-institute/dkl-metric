@@ -1,0 +1,275 @@
+---
+title: "income maps"
+author: "Ivanna Rodríguez"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# install.packages(pacman)
+pacman::p_load(sf, tigris, tidyverse, tidycensus, readxl, magrittr, here, arrow, patchwork)
+```
+
+```{r}
+folder_10 <- 'E:/acs5_block_2010_data/'
+folder_15 <- 'E:/acs5_block_2015_data/'
+folder_20 <- 'E:/acs5_block_2020_data/'
+
+plots_folder <- 'plots/'
+```
+
+```{r}
+states <- c("IL", "NY", "TX", "GA")
+cities <- c("Chicago", "New York", "Houston", "Atlanta")
+
+get_fltr_data <- function(var, prefix=NA) {
+  if (is.na(prefix)) {
+    filename = paste0("dkl_", var, "_10_blkgrp_all_states.parquet")
+  }
+  else {
+    filename = paste0(prefix, "_10_dkl_", var, "_10_blkgrp_all_states.parquet")
+  }
+  #cbsa_10_
+  df_10 <- read_parquet(paste0(folder_10, filename)) %>%
+  ungroup() %>%
+  filter(state_codes %in% states,
+         str_detect(cbsa_title, paste(cities, collapse = "|"))) %>%
+    select(block_fips, county_fips, county_name, cbsa_fips, cbsa_title,
+           state_codes, state_name, group_label, label, block_estimate, block_total,
+           county_estimate, county_total, dkl_block, dkl_bin) %>%
+    mutate(year = 2010)
+  
+  if (is.na(prefix)) {
+    filename = paste0("dkl_", var, "_15_blkgrp_all_states.parquet")
+  }
+  else {
+    filename = paste0(prefix, "_15_dkl_", var, "_15_blkgrp_all_states.parquet")
+  }
+  df_15 <- read_parquet(paste0(folder_15, filename)) %>%
+    ungroup() %>%
+    filter(state_codes %in% states,
+         str_detect(cbsa_title, paste(cities, collapse = "|"))) %>%
+    select(block_fips, county_fips, county_name, cbsa_fips, cbsa_title,
+           state_codes, state_name, group_label, label, block_estimate, block_total,
+           county_estimate, county_total, dkl_block, dkl_bin) %>%
+    mutate(year = 2015)
+  
+  
+  filename = paste0("dkl_", var, "_20_blkgrp_all_states.parquet")
+  
+  df_20 <- read_parquet(paste0(folder_20, filename)) %>%
+    ungroup() %>%
+    filter(state_codes %in% states,
+         str_detect(cbsa_title, paste(cities, collapse = "|"))) %>%
+    select(block_fips, county_fips, county_name, cbsa_fips, cbsa_title,
+           state_codes, state_name, group_label, label, block_estimate, block_total,
+           county_estimate, county_total, dkl_block, dkl_bin) %>%
+    mutate(year = 2020)
+  
+  return(rbind(df_10, df_15, df_20))
+}
+```
+
+
+```{r}
+income <- get_fltr_data("income", prefix = "cbsa")
+```
+
+# Get Shapefiles
+
+```{r}
+state_codes <- income %>% 
+  select(block_fips) %>% 
+  mutate(state_code = str_sub(block_fips, 1, 2)) %>%
+  select(state_code) %>%
+  distinct() %>%
+  pull(state_code)
+
+counties <- income %>%
+  select(county_fips, county_name, cbsa_title) %>%
+  mutate(county_fips = str_sub(county_fips, 3, 5)) %>%
+  distinct()
+```
+
+```{r}
+get_block_shp <- function(state_code, county_codes, yr) {
+  get_acs(year = yr, 
+           geography = "block group", 
+           survey = 'acs5', 
+           variables = 'B19001_001', 
+           state = state_code,
+           county = county_codes,
+           geometry = TRUE) %>%
+    select(GEOID) %>% 
+    st_transform(crs = st_crs(4326))
+}
+```
+
+```{r}
+# to format maps
+my_theme <- function() {
+  theme_minimal() +
+    theme(
+      plot.title = element_text(size = 16, face = "bold"),
+      plot.subtitle = element_text(size = 14),
+      axis.title = element_text(size = 12, face = "bold"),
+      axis.text = element_text(size = 10),
+      legend.title = element_text(size = 10, face = "bold"),
+      legend.text = element_text(size = 8),
+    )
+}
+```
+
+
+# Atlanta
+
+```{r}
+atl_shp_13 <- get_block_shp('13', counties %>% 
+                           filter(str_detect(cbsa_title, "Atlanta")) %>% 
+                           pull(county_fips), 2013 # 2009-2013 5-year ACS - EARLIEST
+                         )
+
+atl_shp_15 <- get_block_shp('13', counties %>% 
+                           filter(str_detect(cbsa_title, "Atlanta")) %>% 
+                           pull(county_fips), 2015 # 2011-2015 5-year ACS
+                         )
+
+atl_shp_20 <- get_block_shp('13', counties %>% 
+                           filter(str_detect(cbsa_title, "Atlanta")) %>% 
+                           pull(county_fips), 2020 # 2016-2020 5-year ACS - HAS MORE ROWS
+                         )
+```
+## Generate maps with DKL calculated from geographies of the corresponding years as well as census shapefiles from the same corresponding year
+
+```{r}
+map_dkl_block <- function(income, city, yr, shp) {
+  
+  df <- income %>%
+    filter(str_detect(cbsa_title, city))
+  
+  max_range <- df %>%
+    group_by(year) %>%
+    summarise(max_dkl = max(dkl_block)) %>%
+    pull(max_dkl) %>%
+    max()
+  
+  df %<>% filter(year == yr)
+  
+  shp %<>%
+    left_join(df, by = c("GEOID" = "block_fips"))
+  
+  cbsa <- df %>% select(cbsa_title) %>% distinct() %>% pull(cbsa_title)
+  
+  shp %>%
+    ggplot() +
+    geom_sf(aes(fill = dkl_block), color = NA, size = 0.001) +
+    scale_fill_viridis_c(option = "magma", direction = -1, 
+                         limits = c(0, max_range), na.value = "lightgray") +
+    labs(title = cbsa,
+         subtitle = paste("DKL for Income in", yr),
+         fill = "DKL (bits)") +  # Adding title to the legend
+    my_theme() +
+    theme(legend.key.width = unit(0.5, "cm"),
+          legend.key.height = unit(0.5, "cm"),
+          legend.text = element_text(size = 7),
+          axis.text = element_blank(),
+          axis.title = element_blank()) 
+}
+```
+
+```{r}
+map_dkl_block(income, "Atlanta", "2010", atl_shp_13)
+map_dkl_block(income, "Atlanta", "2015", atl_shp_15)
+map_dkl_block(income, "Atlanta", "2020", atl_shp_20)
+```
+
+## Now, mapping with census shapefiles for the corresponding year, but using DKL calculated with 2020 geographies
+
+```{r}
+income_2020_cbsas <- get_fltr_data("income")
+```
+
+```{r}
+map_dkl_block(income_2020_cbsas, "Atlanta", "2010", atl_shp_13)
+map_dkl_block(income_2020_cbsas, "Atlanta", "2015", atl_shp_15)
+map_dkl_block(income_2020_cbsas, "Atlanta", "2020", atl_shp_20)
+```
+
+
+```{r}
+chi_shp_13 <- get_block_shp('17', counties %>% 
+                           filter(str_detect(cbsa_title, "Chicago")) %>% 
+                           pull(county_fips), 2013 # 2009-2013 5-year ACS - EARLIEST
+                         )
+
+chi_shp_15 <- get_block_shp('17', counties %>% 
+                           filter(str_detect(cbsa_title, "Chicago")) %>% 
+                           pull(county_fips), 2015 # 2011-2015 5-year ACS
+                         )
+
+chi_shp_20 <- get_block_shp('17', counties %>% 
+                           filter(str_detect(cbsa_title, "Chicago")) %>% 
+                           pull(county_fips), 2020 # 2016-2020 5-year ACS - HAS MORE ROWS
+                         )
+```
+
+
+```{r}
+map_dkl_block(income_2020_cbsas, "Chicago", "2010", chi_shp_13)
+map_dkl_block(income_2020_cbsas, "Chicago", "2015", chi_shp_15)
+map_dkl_block(income_2020_cbsas, "Chicago", "2020", chi_shp_20)
+```
+
+
+
+
+
+
+
+
+```{r}
+map_dkl_block(income_2020_cbsas, "Atlanta", "2010", atl_shp_13)
+map_dkl_block(income_2020_cbsas, "Atlanta", "2015", atl_shp_15)
+map_dkl_block(income_2020_cbsas, "Atlanta", "2020", atl_shp_20)
+```
+
+
+```{r}
+# geoids not in 2020
+shp_not_in_20 <- atl_shp_20 %>%
+  filter(! GEOID %in% atl_shp_15$GEOID)
+
+shp_not_in_15 <- atl_shp_15 %>%
+  filter(! GEOID %in% atl_shp_13$GEOID) # ZERO, so all the shapes continue to be the same?
+
+```
+
+
+```{r}
+income_counts <- income %>% group_by(year) %>%
+  summarise(n_blocks = n_distinct(block_fips),
+            n_missing_dkl_block = sum(is.na(dkl_block)),
+            n_missing_dkl_bin = sum(is.na(dkl_bin)))
+income_counts
+```
+
+```{r}
+income_20_counts <- income_2020_cbsas %>% group_by(year) %>%
+  summarise(n_blocks = n_distinct(block_fips),
+            n_missing_dkl_block = sum(is.na(dkl_block)),
+            n_missing_dkl_bin = sum(is.na(dkl_bin)))
+income_20_counts
+```
+
+```{r}
+income_20_counts %>%
+  select(year, n_blocks) %>%
+  rename(n_blocks_20 = n_blocks) %>%
+  left_join(income_counts %>% select(year, n_blocks), by = "year") %>%
+  mutate(diff = n_blocks_20 - n_blocks)
+```
+

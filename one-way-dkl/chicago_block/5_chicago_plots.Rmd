@@ -1,0 +1,135 @@
+---
+title: "Chicago Figures"
+author: "Ivanna Rodríguez"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+### Read in the data
+
+Here, should probably filter data into their respective categories (i.e. race, income, etc.) so as to have one dataset per each variable so that the plotting function does not have to filter the dataset every time and it runs faster.
+
+The geojsons currently imported all come from tidycensus? but i don't know if they are currently filtered to only include the metro (but probably)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE) # , fig.width = 12, fig.height = 12
+```
+
+```{r}
+# install.packages("pacman")
+pacman::p_load(tidyverse, arrow, sf, tidycensus, viridis, patchwork, here, magrittr)
+source(here("one-way-dkl/chicago_block/plotting_functions.R"))
+```
+
+```{r, include=FALSE}
+# dkl/census variable files
+df15_dkl <- read_parquet(here("one-way-dkl/data/test_dkl_block_15.parquet"))
+df20_dkl <- read_parquet(here("one-way-dkl/data/test_dkl_block_20.parquet"))
+all_dkl <- bind_rows(
+  mutate(df15_dkl, year = 2015),
+  mutate(df20_dkl, year = 2020)
+)
+
+# spatial files
+geom_block_15 <- st_read(here("one-way-dkl/data/geom_block_15.geojson"))
+geom_block_20 <- st_read(here("one-way-dkl/data/geom_block_20.geojson"))
+community_areas <- st_read(here("one-way-dkl/data/community_areas.geojson"))
+
+# add spatial info to dkl data sets
+map_dkl_df15_all_cbsa <- geom_block_15 %>% 
+  right_join(df15_dkl, by=c('GEOID'='block_fips'))
+
+map_dkl_df15 <- geom_block_15 %>% 
+  right_join(subset(df15_dkl, cbsa_fips == '16980'), by=c('GEOID'='block_fips'))
+
+map_dkl_df20_all_cbsa <- geom_block_20 %>% 
+  right_join(df20_dkl, by=c('GEOID'='block_fips'))
+
+map_dkl_df20 <- geom_block_20 %>% 
+  right_join(subset(df20_dkl, cbsa_fips == '16980'), by=c('GEOID'='block_fips'))
+
+# join all into one year(?)  or no ....
+```
+
+```{r}
+community_data <- data.frame(
+  community = c("Downtown", "Hyde Park", "Chatham", "Riverdale", "Little Village", "Humboldt Park", "Lincoln Park", "Albany Park", "Rosemont", "Elk Grove Village"),
+  lon = c(-87.623177, -87.5917, -87.6146, -87.6149, -87.7050, -87.7213, -87.6488, 
+          -87.7280, -87.87324003415466, -87.97473373657915),
+  lat = c(41.881832, 41.7948, 41.7401, 41.6476, 41.8445, 41.8991, 41.9255,
+          41.9683, 41.98656849330927, 42.002371095468035)
+  )
+```
+
+```{r}
+# create diff datasets for each var
+race_15 <- get_var_df(map_dkl_df15, group_lab = "Race/Ethnicity")
+race_20 <- get_var_df(map_dkl_df20, group_lab = "Race/Ethnicity")
+
+income_15 <- get_var_df(map_dkl_df15, group_lab = "Household Income")
+income_20 <- get_var_df(map_dkl_df20, group_lab = "Household Income")
+
+educ_15 <- get_var_df(map_dkl_df15, group_lab = "Education attainment")
+educ_20 <- get_var_df(map_dkl_df20, group_lab = "Education attainment")
+
+emp_15 <- get_var_df(map_dkl_df15, group_lab = "Employment")
+emp_20 <- get_var_df(map_dkl_df20, group_lab = "Employment")
+```
+
+```{r}
+plot_bin_bar_dodge(all_dkl, group_lab = 'Race/Ethnicity', cbsa = '16980')
+plot_bin_bar_dodge(all_dkl, group_lab = 'Household Income', cbsa = '16980')
+plot_bin_bar_dodge(all_dkl, group_lab = 'Education attainment', cbsa = '16980')
+plot_bin_bar_dodge(all_dkl, group_lab = 'Employment', cbsa = '16980')
+```
+
+
+
+```{r}
+# income maps
+max_range <- max(max(race_15$dkl_block), max(race_20$dkl_block))
+
+r15 <- map_dkl(race_15, "Race/Ethnicity", "2015", max_range)
+r20 <- map_dkl(race_20, "Race/Ethnicity", "2020", max_range)
+
+r15 + r20
+```
+
+
+```{r}
+# income maps
+max_range <- max(max(income_15$dkl_block), max(income_20$dkl_block))
+
+i15 <- map_dkl(income_15, "Household Income", "2015", max_range)
+i20 <- map_dkl(income_20, "Household Income", "2020", max_range)
+
+i15 + i20
+```
+
+
+```{r}
+# education maps
+max_range <- max(max(educ_15$dkl_block), max(educ_20$dkl_block))
+
+ed15 <- map_dkl(educ_15, "Education attainment", "2015", max_range)
+ed20 <- map_dkl(educ_20, "Education attainment", "2020", max_range)
+
+ed15 + ed20
+```
+
+
+```{r}
+# employment maps
+max_range <- max(2.5, 2.5)
+
+em15 <- map_dkl(emp_15, "Employment", "2015", max_range)
+em20 <- map_dkl(emp_20, "Employment", "2020", max_range)
+
+em15 + em20
+```
+
+
+
+

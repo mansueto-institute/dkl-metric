@@ -1,0 +1,382 @@
+---
+title: "income maps"
+author: "Ivanna Rodríguez"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# install.packages(pacman)
+pacman::p_load(sf, tigris, tidyverse, tidycensus, readxl, magrittr, here, arrow, patchwork, ggspatial)
+```
+
+```{r}
+folder_10 <- 'E:/acs5_block_2010_data/'
+folder_15 <- 'E:/acs5_block_2015_data/'
+folder_20 <- 'E:/acs5_block_2020_data/'
+
+plots_folder <- 'plots/'
+```
+
+```{r}
+states <- c("IL", "NY", "TX", "GA")
+cities <- c("Chicago", "New York", "Houston", "Atlanta")
+
+get_fltr_data <- function(var) {
+  df_10 <- read_parquet(paste0(folder_10, 
+                             paste0("dkl_", var, "_10_blkgrp_all_states.parquet"))) %>%
+  ungroup() %>%
+  filter(state_codes %in% states,
+         str_detect(cbsa_title, paste(cities, collapse = "|"))) %>%
+    select(block_fips, county_fips, county_name, cbsa_fips, cbsa_title,
+           state_codes, state_name, group_label, label, block_estimate, block_total,
+           county_estimate, county_total, dkl_block, dkl_bin) %>%
+    mutate(year = 2010)
+  
+  df_15 <- read_parquet(paste0(folder_15, 
+                               paste0("dkl_", var, "_15_blkgrp_all_states.parquet"))) %>%
+    ungroup() %>%
+    filter(state_codes %in% states,
+         str_detect(cbsa_title, paste(cities, collapse = "|"))) %>%
+    select(block_fips, county_fips, county_name, cbsa_fips, cbsa_title,
+           state_codes, state_name, group_label, label, block_estimate, block_total,
+           county_estimate, county_total, dkl_block, dkl_bin) %>%
+    mutate(year = 2015)
+  
+  df_20 <- read_parquet(paste0(folder_20, 
+                               paste0("dkl_", var, "_20_blkgrp_all_states.parquet"))) %>%
+    ungroup() %>%
+    filter(state_codes %in% states,
+         str_detect(cbsa_title, paste(cities, collapse = "|"))) %>%
+    select(block_fips, county_fips, county_name, cbsa_fips, cbsa_title,
+           state_codes, state_name, group_label, label, block_estimate, block_total,
+           county_estimate, county_total, dkl_block, dkl_bin) %>%
+    mutate(year = 2020)
+  
+  return(rbind(df_10, df_15, df_20))
+}
+```
+
+```{r}
+income <- get_fltr_data("income")
+```
+
+# Get Shapefiles
+
+Here, I am using the block groups shapefiles from `tidycensus` and filtering to only include block groups within a particular CBSA area. For 2010 and 2015, the shapefile I am using is a 2015 shapefile, whereas for year 2020 I use a 2020 shapefile. This is because the 2020 GEOIDs for census block groups seem to have changed. So the maps for 2010 and 2015 look incomplete when using 2020 shapefiles because the names cannot be matched.
+
+
+```{r}
+state_codes <- income %>% 
+  select(block_fips) %>% 
+  mutate(state_code = str_sub(block_fips, 1, 2)) %>%
+  select(state_code) %>%
+  distinct() %>%
+  pull(state_code)
+
+counties <- income %>%
+  select(county_fips, county_name, cbsa_title) %>%
+  mutate(county_fips = str_sub(county_fips, 3, 5)) %>%
+  distinct()
+```
+
+
+```{r}
+get_block_shp <- function(state_code, county_codes, yr) {
+  get_acs(year = yr, 
+           geography = "block group", 
+           survey = 'acs5', 
+           variables = 'B19001_001', 
+           state = state_code,
+           county = county_codes,
+           geometry = TRUE) %>%
+    select(GEOID) %>% 
+    st_transform(crs = st_crs(4326))
+}
+```
+
+```{r}
+atl_shp_15 <- get_block_shp('13', counties %>% 
+                           filter(str_detect(cbsa_title, "Atlanta")) %>% 
+                           pull(county_fips), 2015
+                         )
+
+atl_shp_20 <- get_block_shp('13', counties %>% 
+                           filter(str_detect(cbsa_title, "Atlanta")) %>% 
+                           pull(county_fips), 2020
+                         )
+```
+```{r}
+nyc_shp_15 <- get_block_shp('36', counties %>% 
+                           filter(str_detect(cbsa_title, "New York")) %>% 
+                           pull(county_fips), 2015)
+
+nyc_shp_20 <- get_block_shp('36', counties %>% 
+                           filter(str_detect(cbsa_title, "New York")) %>% 
+                           pull(county_fips), 2020)
+```
+```{r}
+chicago_shp_15 <- get_block_shp('17', counties %>% 
+                           filter(str_detect(cbsa_title, "Chicago")) %>% 
+                           pull(county_fips), 2015)
+
+chicago_shp_20 <- get_block_shp('17', counties %>% 
+                           filter(str_detect(cbsa_title, "Chicago")) %>% 
+                           pull(county_fips), 2020)
+```
+
+```{r}
+houston_shp_15 <- get_block_shp('48', counties %>% 
+                           filter(str_detect(cbsa_title, "Houston")) %>% 
+                           pull(county_fips), 2015)
+
+houston_shp_20 <- get_block_shp('48', counties %>% 
+                           filter(str_detect(cbsa_title, "Houston")) %>% 
+                           pull(county_fips), 2020)
+```
+
+```{r}
+my_theme <- function() {
+  theme_minimal() +
+    theme(
+      plot.title = element_text(size = 16, face = "bold"),
+      plot.subtitle = element_text(size = 14),
+      axis.title = element_text(size = 12, face = "bold"),
+      axis.text = element_text(size = 10),
+      legend.title = element_text(size = 10, face = "bold"),
+      legend.text = element_text(size = 8),
+    )
+}
+```
+
+# Generate Maps
+
+```{r}
+get_spatial_income_data <- function(income, city, yr, shp) {
+  df <- income %>%
+    filter(str_detect(cbsa_title, city),
+           year == yr)
+  
+  shp %<>%
+    left_join(df, by = c("GEOID" = "block_fips")) %>%
+    select(GEOID, geometry, dkl_block) %>%
+    distinct()
+  
+  return(shp)
+}
+
+
+format_bin_ranges <- function(vec) {
+  # return equally distributed bins for numeric vector column
+  breaks <- quantile(vec, probs = seq(0, 1, by = 0.25), na.rm = TRUE)
+  labels <- c()
+  for (i in 1:(length(breaks) - 1)) {
+    # adjust lower bound to avoid repetition
+    lower_bound <- ifelse(i == 1, breaks[i], breaks[i] + 0.01)
+    
+    labels <- c(labels, paste0(format(round(lower_bound, 2), nsmall = 2),
+                                "-",
+                                format(round(breaks[i+1], 2), nsmall = 2)))
+  }
+  return(labels)
+}
+
+
+map_dkl_block <- function(income, city, yr, shp) {
+  
+  shp_map <- get_spatial_income_data(income, city, yr, shp)
+  
+  bin_labels <- format_bin_ranges(shp_map$dkl_block)
+  
+  shp_map %<>%
+    mutate(dkl_block_group = cut(dkl_block, 
+                               breaks = quantile(dkl_block, 
+                                                 probs = seq(0, 1, by = 0.25), 
+                                                 na.rm = TRUE),
+                               labels = bin_labels,
+                               include.lowest = TRUE))
+  
+  cbsa <- df %>% select(cbsa_title) %>% distinct() %>% pull(cbsa_title)
+  
+  custom_colors <- c("#404040", "#b1b1b1", "#F7C3AB", "#CA0020")
+  
+  shp_map %>%
+    ggplot() +
+    annotation_map_tile("cartolight", zoomin = 0) +
+    geom_sf(aes(fill = dkl_block_group), color = NA, alpha = 0.6, size = 0.05) +
+    scale_fill_manual(values = custom_colors, 
+                      breaks = bin_labels,
+                      labels = bin_labels,
+                      name = "DKL (bits)") +
+    labs(title = cbsa,
+         subtitle = paste("DKL for Income in", yr)) +
+    theme(axis.text = element_blank(),
+          axis.title = element_blank(),
+          axis.ticks = element_blank())
+}
+```
+
+```{r}
+# format_bin_ranges <- function(vec) {
+#   # return equally distributed bins for numeric vector column
+#   breaks <- quantile(vec, probs = seq(0, 1, by = 0.25), na.rm = TRUE)
+#   labels <- c()
+#   for (i in 1:(length(breaks) - 1)) {
+#     # adjust lower bound to avoid repetition
+#     lower_bound <- ifelse(i == 1, breaks[i], breaks[i] + 0.01)
+#     
+#     labels <- c(labels, paste0(format(round(lower_bound, 2), nsmall = 2),
+#                                 "-",
+#                                 format(round(breaks[i+1], 2), nsmall = 2)))
+#   }
+#   return(labels)
+# }
+# 
+# 
+# map_dkl_block <- function(income, city, yr, shp) {
+#   df <- income %>%
+#     filter(str_detect(cbsa_title, city))
+#   
+#   # max_range <- df %>%
+#   #   group_by(year) %>%
+#   #   summarise(max_dkl = max(dkl_block, na.rm = TRUE)) %>%
+#   #   pull(max_dkl) %>%
+#   #   max()
+#   
+#   df %<>% filter(year == yr)
+#   
+#   bin_labels <- format_bin_ranges(shp$dkl_block)
+#   
+#   shp %<>%
+#     left_join(df, by = c("GEOID" = "block_fips")) %>%
+#     select(GEOID, geometry, dkl_block) %>%
+#     distinct() %>%
+#     mutate(dkl_block_group = cut(dkl_block, 
+#                                breaks = quantile(dkl_block, 
+#                                                  probs = seq(0, 1, by = 0.25), 
+#                                                  na.rm = TRUE),
+#                                labels = bin_labels,
+#                                include.lowest = TRUE))
+#   
+#   cbsa <- df %>% select(cbsa_title) %>% distinct() %>% pull(cbsa_title)
+#   
+#   custom_colors <- c("#404040", "#b1b1b1", "#F7C3AB", "#CA0020")
+#   
+#   shp %>%
+#     ggplot() +
+#     annotation_map_tile("cartolight", zoomin = 0) +
+#     geom_sf(aes(fill = dkl_block_group), color = NA, alpha = 0.6, size = 0.05) +
+#     scale_fill_manual(values = custom_colors, 
+#                       breaks = bin_labels,
+#                       labels = bin_labels,
+#                       name = "DKL")
+#   
+#   # shp %>%
+#   #   ggplot() +
+#   #   annotation_map_tile("cartolight", zoomin = 0) +
+#   #   geom_sf(aes(fill = dkl_block_group), color = NA, alpha = 0.7, size = 0.05) +
+#   #   scale_fill_manual(values = custom_colors, breaks = bin_labels, labels = bin_labels,
+#   #                     name = "DKL") +
+#   #   # scale_fill_viridis_c(option = "magma", direction = -1,
+#   #   #                      limits = c(0, max_range), na.value = "lightgray") +
+#   #   # scale_fill_gradient(low = "black", high = "darkred", 
+#   #   #                     limits = c(0, max_range), na.value = "white") +
+#   #   labs(title = cbsa,
+#   #        subtitle = paste("DKL for Income in", yr),
+#   #        fill = "DKL (bits)") +  # Adding title to the legend
+#   #   my_theme() +
+#   #   theme(legend.key.width = unit(0.5, "cm"),
+#   #         legend.key.height = unit(0.5, "cm"),
+#   #         legend.text = element_text(size = 7),
+#   #         axis.text = element_blank(),
+#   #         axis.title = element_blank())
+# }
+```
+
+
+```{r}
+atl_10 <- map_dkl_block(income, "Atlanta", "2010", atl_shp_15)
+atl_15 <- map_dkl_block(income, "Atlanta", "2015", atl_shp_15)
+atl_20 <- map_dkl_block(income, "Atlanta", "2020", atl_shp_20)
+```
+
+```{r}
+atl_10
+ggsave(paste0(plots_folder, "map10_atl.png"), dpi = 300)
+
+atl_15
+ggsave(paste0(plots_folder, "map15_atl.png"), dpi = 300)
+
+atl_20
+ggsave(paste0(plots_folder, "map20_atl.png"), dpi = 300)
+```
+```{r}
+nyc_10 <- map_dkl_block("New York", "2010")
+nyc_15 <- map_dkl_block("New York", "2015")
+nyc_20 <- map_dkl_block("New York", "2020")
+```
+
+```{r}
+nyc_10
+ggsave(paste0(plots_folder, "map10_nyc.png"), dpi = 300)
+
+nyc_15
+ggsave(paste0(plots_folder, "map15_nyc.png"), dpi = 300)
+
+nyc_20
+ggsave(paste0(plots_folder, "map20_nyc.png"), dpi = 300)
+```
+
+```{r}
+hst_10 <- map_dkl_block("Houston", "2010")
+hst_15 <- map_dkl_block("Houston", "2015")
+hst_20 <- map_dkl_block("Houston", "2020")
+```
+
+```{r}
+hst_10
+ggsave(paste0(plots_folder, "map10_houston.png"), dpi = 300)
+
+hst_15
+ggsave(paste0(plots_folder, "map15_houston.png"), dpi = 300)
+
+hst_20
+ggsave(paste0(plots_folder, "map20_houston.png"), dpi = 300)
+```
+
+```{r}
+chi_10 <- map_dkl_block(income, "Chicago", "2010", chicago_shp_15)
+chi_15 <- map_dkl_block(income, "Chicago", "2015", chicago_shp_15)
+chi_20 <- map_dkl_block(income, "Chicago", "2020", chicago_shp_20)
+```
+
+```{r}
+chi_10
+ggsave(paste0(plots_folder, "map10_chicago.png"), dpi = 300)
+
+chi_15 
+ggsave(paste0(plots_folder, "map15_chicago.png"), dpi = 300)
+
+chi_20
+ggsave(paste0(plots_folder, "map20_chicago.png"), dpi = 300)
+```
+
+```{r}
+knitr::opts_chunk$set(dev = "ragg_png")
+```
+
+```{r}
+income %>%
+  group_by(cbsa_title, year) %>%
+  summarise(min_dkl = min(dkl_block),
+            max_dkl = max(dkl_block))
+```
+
+
+
+
+
