@@ -138,12 +138,26 @@ def fetch_block_group_data(
 
     all_records: list[dict] = []
 
+    # ACS variables need an 'E' suffix for estimates (e.g. B19001_001 → B19001_001E).
+    # Decennial SF1/SF3 variables do not use a suffix.
+    def _api_code(var: str) -> str:
+        if dataset == "acs5" and not var.endswith("E") and not var.endswith("M"):
+            return var + "E"
+        return var
+
+    def _base_code(api_var: str) -> str:
+        if dataset == "acs5" and api_var.endswith("E"):
+            return api_var[:-1]
+        return api_var
+
     for chunk in _chunk_variables(variables):
+        api_chunk = [_api_code(v) for v in chunk]
         logger.debug("Fetching %d vars for %s %s %s …", len(chunk), dataset, year, state)
         rows = ds.state_county_blockgroup(
-            fields=["NAME"] + chunk,
+            fields=["NAME"] + api_chunk,
             state_fips=state_fips,
             county_fips=Census.ALL,
+            blockgroup=Census.ALL,
             tract=Census.ALL,
             year=year,
         )
@@ -152,15 +166,15 @@ def fetch_block_group_data(
             continue
         for row in rows:
             geoid = _build_geoid(row, state_fips)
-            for var in chunk:
-                raw = row.get(var)
+            for api_var, var in zip(api_chunk, chunk):
+                raw = row.get(api_var)
                 try:
                     estimate = int(raw) if raw is not None and raw != "" else None
                 except (ValueError, TypeError):
                     estimate = None
                 record: dict = {
                     "geoid": geoid,
-                    "variable": var,
+                    "variable": var,   # always store the base code (no E suffix)
                     "estimate": estimate,
                     "state": state,
                 }
