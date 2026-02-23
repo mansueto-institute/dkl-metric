@@ -145,7 +145,12 @@ def join_metro_data(
     df = raw_df.copy()
     df = df.rename(columns={"state": "state_codes", "estimate": "block_estimate"})
 
-    # Merge variable labels
+    # Merge variable labels (drop any pre-existing label columns from raw to avoid
+    # pandas renaming them to label_x / label_y on merge)
+    drop_cols = [c for c in ["label", "variable_group", "variable_item", "group_label"]
+                 if c in df.columns]
+    if drop_cols:
+        df = df.drop(columns=drop_cols)
     df = df.merge(label_df, on="variable", how="inner")
 
     # Geographic FIPS decomposition
