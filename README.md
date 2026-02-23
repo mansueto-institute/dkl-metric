@@ -2,7 +2,8 @@
 
 This repository contains code to calculate a one-way Kullback-Leibler (DKL) divergence metric for spatial selection — a measure of how unevenly demographic groups are distributed across block groups within a metropolitan area — and to aggregate it to a mutual information (MI) score at the MSA level.
 
-The metric is described in the paper **"DKL for Spatial Selection"** and covers race/ethnicity, household income, educational attainment, and employment status at the Census block group level for all MSAs in the United States, for 2015 and 2020.
+The metric is described in the paper "Decoding the city: multiscale spatial information
+in urban income distributions"  (https://arxiv.org/abs/2509.22954) in  and covers race/ethnicity, household income, educational attainment, and employment status at the Census block group level for all MSAs in the United States, for 2015 and 2020.
 
 ---
 
@@ -111,7 +112,7 @@ pipeline/               # Python pipeline (primary)
     └── 8_income_maps.ipynb
 one-way-dkl/            # Original R scripts
 archive/                # Legacy code
-nicos_code/             # Original scripts (Nico Pesaran)
+nicos_code/             # Original scripts (Nico Marchio)
 ```
 
 ---
