@@ -52,6 +52,7 @@ python 5_shapefiles.py --years 2020
 | `notebooks/6_mutual_info_plots.ipynb` | Bar charts, violin plots, and lollipop chart of MI by CBSA |
 | `notebooks/7_income_plots.ipynb` | DKL bin by income bracket for Atlanta, Chicago, Houston, New York |
 | `notebooks/8_income_maps.ipynb` | Choropleth maps of block-level DKL income segregation |
+| `notebooks/9_two_way_dkl.ipynb` | Two-way DKL (joint race × income) at tract level; heatmaps, dot plots, and choropleth maps |
 
 ### Supported Years & Datasets
 
@@ -76,6 +77,23 @@ p_yj    = cbsa_estimate / cbsa_total        # P(bin j in MSA)
 dkl_block(i) = Σ_j  p_yj_ni * log2(p_yj_ni / p_yj)   # block-level DKL
 MI(cbsa)     = Σ_i  p_ni * dkl_block(i)               # population-weighted MI
 ```
+
+### Two-Way DKL Formula
+
+`notebooks/9_two_way_dkl.ipynb` extends the one-way metric to the *joint* distribution of two variables (race and income) using ACS tables B19001A–I at the **census tract** level:
+
+```
+p_yjzk_ni = (tract households in race j, income k) / tract total
+p_yjzk    = (MSA households in race j, income k)   / MSA total
+
+dkl_2way(i) = Σ_{j,k}  p_yjzk_ni * log2(p_yjzk_ni / p_yjzk)
+
+Residual(i) = dkl_2way(i) − dkl_race(i) − dkl_income(i)
+```
+
+The residual captures sorting specific to particular race × income combinations beyond what either dimension alone predicts.
+
+> **Note:** B19001A–I cross-tabulations are published at tract level only, not block group level.
 
 ---
 
@@ -109,7 +127,8 @@ pipeline/               # Python pipeline (primary)
 └── notebooks/
     ├── 6_mutual_info_plots.ipynb
     ├── 7_income_plots.ipynb
-    └── 8_income_maps.ipynb
+    ├── 8_income_maps.ipynb
+    └── 9_two_way_dkl.ipynb
 one-way-dkl/            # Original R scripts
 archive/                # Legacy code
 nicos_code/             # Original scripts (Nico Marchio)
