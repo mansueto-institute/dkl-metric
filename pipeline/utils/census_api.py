@@ -190,6 +190,126 @@ def fetch_block_group_data(
     return df
 
 
+def _build_geoid_tract(row: dict, state_fips: str) -> str:
+    """Build an 11-digit tract GEOID from an API response row."""
+    state  = str(row.get("state", state_fips)).zfill(2)
+    county = str(row.get("county", "")).zfill(3)
+    tract  = str(row.get("tract", "")).zfill(6)
+    return f"{state}{county}{tract}"
+
+
+def fetch_tract_data(
+    year: int,
+    dataset: str,
+    variables: List[str],
+    state: str,
+    api_key: str,
+    *,
+    var_label_map: Optional[dict] = None,
+) -> pd.DataFrame:
+    """Fetch census-tract level Census data for a single state.
+
+    Identical logic to fetch_block_group_data() but calls
+    state_county_tract() and produces 11-digit GEOIDs.
+    """
+    client = _make_client(api_key)
+    state_fips = _fips_for_state(state)
+
+    if dataset == "acs5":
+        ds = client.acs5
+    elif dataset in ("sf1", "sf3"):
+        ds = getattr(client, dataset)
+    else:
+        raise ValueError(f"Unsupported dataset '{dataset}'. Use 'acs5', 'sf1', or 'sf3'.")
+
+    all_records: list[dict] = []
+
+    def _api_code(var: str) -> str:
+        if dataset == "acs5" and not var.endswith("E") and not var.endswith("M"):
+            return var + "E"
+        return var
+
+    def _base_code(api_var: str) -> str:
+        if dataset == "acs5" and api_var.endswith("E"):
+            return api_var[:-1]
+        return api_var
+
+    for chunk in _chunk_variables(variables):
+        api_chunk = [_api_code(v) for v in chunk]
+        logger.debug("Fetching %d vars for %s %s %s (tract) …", len(chunk), dataset, year, state)
+        rows = ds.state_county_tract(
+            fields=["NAME"] + api_chunk,
+            state_fips=state_fips,
+            county_fips=Census.ALL,
+            tract=Census.ALL,
+            year=year,
+        )
+        if rows is None:
+            logger.warning("No data returned for %s %s %s (tract)", dataset, year, state)
+            continue
+        for row in rows:
+            geoid = _build_geoid_tract(row, state_fips)
+            for api_var, var in zip(api_chunk, chunk):
+                raw = row.get(api_var)
+                try:
+                    estimate = int(raw) if raw is not None and raw != "" else None
+                except (ValueError, TypeError):
+                    estimate = None
+                record: dict = {
+                    "geoid": geoid,
+                    "variable": var,
+                    "estimate": estimate,
+                    "state": state,
+                }
+                if var_label_map is not None:
+                    record["label"] = var_label_map.get(var, var)
+                all_records.append(record)
+
+    if not all_records:
+        return pd.DataFrame(columns=["geoid", "variable", "estimate", "state"])
+
+    df = pd.DataFrame(all_records)
+    df["estimate"] = pd.to_numeric(df["estimate"], errors="coerce").astype("Int64")
+    return df
+
+
+def fetch_all_states_tract(
+    year: int,
+    dataset: str,
+    variables: List[str],
+    state_codes: List[str],
+    api_key: str,
+    *,
+    var_label_map: Optional[dict] = None,
+    show_progress: bool = True,
+) -> pd.DataFrame:
+    """Fetch tract-level data for all states and concatenate."""
+    try:
+        from tqdm import tqdm
+        iterator = tqdm(state_codes, desc=f"{dataset} {year} (tract)", unit="state") if show_progress else state_codes
+    except ImportError:
+        iterator = state_codes
+
+    frames: list[pd.DataFrame] = []
+    for state in iterator:
+        try:
+            df = fetch_tract_data(
+                year=year,
+                dataset=dataset,
+                variables=variables,
+                state=state,
+                api_key=api_key,
+                var_label_map=var_label_map,
+            )
+            frames.append(df)
+        except Exception as exc:
+            logger.error("Failed to fetch %s %s %s (tract): %s", dataset, year, state, exc)
+
+    if not frames:
+        return pd.DataFrame(columns=["geoid", "variable", "estimate", "state"])
+    return pd.concat(frames, ignore_index=True)
+
+
 def fetch_all_states(
     year: int,
     dataset: str,

@@ -258,18 +258,24 @@ def build_label_df(var_group: str) -> pd.DataFrame:
 # Per-year processing
 # ---------------------------------------------------------------------------
 
-def _raw_path(year: int, var_group: str) -> Path:
+def _raw_path(year: int, var_group: str, geo: str = "blockgroup") -> Path:
+    if geo == "tract":
+        return DATA_DIR / f"acs5_tract_{year}_data" / "raw" / f"{var_group}_tract_all_states_{year}.parquet"
     return DATA_DIR / f"acs5_block_{year}_data" / "raw" / f"{var_group}_blkgrp_all_states_{year}.parquet"
 
 
-def _clean_path(year: int, var_group: str) -> Path:
-    yr_short = str(year)[2:]  # '2015' → '15', '2020' → '20'
+def _clean_path(year: int, var_group: str, geo: str = "blockgroup") -> Path:
+    yr_short = str(year)[2:]
+    if geo == "tract":
+        d = DATA_DIR / f"acs5_tract_{year}_data"
+        d.mkdir(parents=True, exist_ok=True)
+        return d / f"{var_group}_{yr_short}_tract_all_states.parquet"
     d = DATA_DIR / f"acs5_block_{year}_data"
     d.mkdir(parents=True, exist_ok=True)
     return d / f"{var_group}_{yr_short}_blkgrp_all_states.parquet"
 
 
-def clean_year(year: int, var_groups: list[str], cbsa_year: int = 2020) -> None:
+def clean_year(year: int, var_groups: list[str], cbsa_year: int = 2020, geo: str = "blockgroup") -> None:
     """Clean a single ACS year."""
     config = YEAR_CONFIGS[year]
     cbsa_xwalk = get_cbsa_xwalk(cbsa_year)
@@ -280,17 +286,17 @@ def clean_year(year: int, var_groups: list[str], cbsa_year: int = 2020) -> None:
             logger.warning("Skipping %s for %d — not available.", vg, year)
             continue
 
-        raw_path = _raw_path(year, vg)
+        raw_path = _raw_path(year, vg, geo)
         if not raw_path.exists():
-            logger.error("Raw file not found: %s — run 0_download.py first.", raw_path)
+            logger.error("Raw file not found: %s — run 0_download.py --geo %s first.", raw_path, geo)
             continue
 
-        out_path = _clean_path(year, vg)
+        out_path = _clean_path(year, vg, geo)
         if out_path.exists():
             logger.info("Already exists, skipping: %s", out_path.name)
             continue
 
-        logger.info("Cleaning %d — %s …", year, vg)
+        logger.info("Cleaning %d — %s (%s) …", year, vg, geo)
         raw_df = pd.read_parquet(raw_path)
         label_df = build_label_df(vg)
 
@@ -318,6 +324,10 @@ def parse_args() -> argparse.Namespace:
         "--cbsa-year", type=int, default=2020,
         help="CBSA delineation year to use (default: 2020, applied retroactively).",
     )
+    parser.add_argument(
+        "--geo", default="blockgroup", choices=["blockgroup", "tract"],
+        help="Geographic level to clean (default: blockgroup).",
+    )
     return parser.parse_args()
 
 
@@ -328,4 +338,4 @@ if __name__ == "__main__":
         if yr not in YEAR_CONFIGS:
             logger.warning("Year %d not in YEAR_CONFIGS — skipping.", yr)
             continue
-        clean_year(yr, args.vars, cbsa_year=args.cbsa_year)
+        clean_year(yr, args.vars, cbsa_year=args.cbsa_year, geo=args.geo)
