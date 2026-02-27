@@ -141,8 +141,18 @@ STATE_CODES = [
 # ---------------------------------------------------------------------------
 
 CITIES = [
-    "Chicago-Naperville-Elgin, IL-IN-WI",
-    "Houston-The Woodlands-Sugar Land, TX",
     "Atlanta-Sandy Springs-Alpharetta, GA",
+    "Boston-Cambridge-Newton, MA-NH",
+    "Chicago-Naperville-Elgin, IL-IN-WI",
+    "Dallas-Fort Worth-Arlington, TX",
+    "Detroit-Warren-Dearborn, MI",
+    "Houston-The Woodlands-Sugar Land, TX",
+    "Los Angeles-Long Beach-Anaheim, CA",
+    "Miami-Fort Lauderdale-Pompano Beach, FL",
+    "Minneapolis-St. Paul-Bloomington, MN-WI",
     "New York-Newark-Jersey City, NY-NJ-PA",
+    "Philadelphia-Camden-Wilmington, PA-NJ-DE-MD",
+    "Phoenix-Mesa-Chandler, AZ",
+    "Seattle-Tacoma-Bellevue, WA",
+    "Washington-Arlington-Alexandria, DC-VA-MD-WV",
 ]
